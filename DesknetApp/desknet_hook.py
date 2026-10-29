@@ -13,6 +13,7 @@ SUPPORT = os.path.expanduser("~/Library/Application Support/Desknet")
 LOG = SUPPORT + "/hook.log"
 SOCKET = os.path.expanduser("~/Library/Caches/desknet.sock")
 MAC_AGENT = SUPPORT + "/Agent/macosx/DesknetAgent.framework/DesknetAgent"
+SIM_AGENT = SUPPORT + "/Agent/iphonesimulator/DesknetAgent.framework/DesknetAgent"
 BP_NAME = "desknet-agent"
 # iOS (device and Simulator) and macOS app entry points.
 ENTRY_POINTS = ("UIApplicationMain", "NSApplicationMain")
@@ -99,9 +100,13 @@ def _agent_path(target):
             return os.path.normpath(os.path.join(os.path.dirname(remote), rel))
     # Mac app run from Xcode: load the agent Desknet.app installed. It's signed with the same
     # team as apps built on this Mac, which library validation accepts.
-    # ponytail: Simulator agent isn't built yet (PLAN 1.0); SDK apps there already send logs.
-    if "macosx" in (target.GetTriple() or "") and ".app/Contents/MacOS/" in exe and os.path.exists(MAC_AGENT):
+    triple = target.GetTriple() or ""
+    if "macosx" in triple and ".app/Contents/MacOS/" in exe and os.path.exists(MAC_AGENT):
         return MAC_AGENT
+    # Simulator processes see the Mac's filesystem, so the host path loads as is.
+    # ponytail: an app that also links Desknet-iOS sends each request twice (the SDK has no marker to stand down on).
+    if "-simulator" in triple and ".app/" in exe and os.path.exists(SIM_AGENT):
+        return SIM_AGENT
     return None
 
 def _inject(process, target):
