@@ -99,6 +99,7 @@ final class DesknetBridgeListener: @unchecked Sendable {
     private let onCommand: @Sendable (DesknetBridgeMessage) -> Void
     private let lock = NSLock()
     private var listenFD: Int32?
+    private var listenInode: ino_t = 0
 
     init(store: DesknetStore, path: String = DesknetBridgeSocket.path(),
          onCommand: @escaping @Sendable (DesknetBridgeMessage) -> Void) {
@@ -123,6 +124,8 @@ final class DesknetBridgeListener: @unchecked Sendable {
             return .failed
         }
         listenFD = fd
+        var info = stat()
+        listenInode = stat(path, &info) == 0 ? info.st_ino : 0
         DesknetDiagnostics.log("Bridge", "listening path=\(path)")
 
         // ponytail: one thread per client; fine for a handful of debug apps. Move to DispatchSource if that grows.
@@ -137,6 +140,20 @@ final class DesknetBridgeListener: @unchecked Sendable {
             }
         }
         return .listening
+    }
+
+    /// Listens again if the socket file was deleted or replaced by a viewer that has since quit.
+    /// Without this, Desknet stays open but no app can reach it until it's relaunched.
+    /// ponytail: the old fd and its accept thread are left behind, one per repair; fine for a rare event.
+    func repairIfNeeded() {
+        lock.lock()
+        var info = stat()
+        let intact = listenFD == nil || (stat(path, &info) == 0 && info.st_ino == listenInode)
+        if !intact { listenFD = nil }
+        lock.unlock()
+        guard !intact else { return }
+        DesknetDiagnostics.log("Bridge", "socket file gone, listening again path=\(path)")
+        _ = start()
     }
 
     func stop() {

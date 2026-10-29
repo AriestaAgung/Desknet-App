@@ -101,7 +101,7 @@ Done so far (2026-10-29, commit `6600e2a`): the `DesknetApp` target builds `Desk
 
 ## Phase 2: Desknet.app (this repo)
 
-- [ ] **2.1 UI.**
+- [x] **2.1 UI.**
   - Port the monitor view and detail view.
   - A sidebar of sources plus "All".
   - Show "Failed" instead of "Running" for failed requests.

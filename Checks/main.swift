@@ -43,6 +43,17 @@ assert(commands == ["toggle"], "commands: \(commands)")
 store.clear()
 assert(store.snapshot().isEmpty && store.countsByPID().isEmpty)
 
+// A deleted socket file is re-created, so the viewer doesn't go deaf.
+let checkPath = "/tmp/desknet-check.sock"
+assert(listener.start() == .listening)
+unlink(checkPath)
+assert(DesknetBridgeSocket.connect(to: checkPath) == nil)
+listener.repairIfNeeded()
+let repaired = DesknetBridgeSocket.connect(to: checkPath)
+assert(repaired != nil, "socket not re-created")
+close(repaired!)
+listener.stop()
+
 // Which processes count as "run from Xcode".
 let sim = "/Users/u/Library/Developer/CoreSimulator/Devices/57D0AD07-A3AF-45E9-88D3-C0F47DFE3869/data/Containers/Bundle/Application/F10E/Ticker.app/Ticker"
 assert(RunningAppScanner.classify(path: sim, isTraced: true)?.simulatorUDID == "57D0AD07-A3AF-45E9-88D3-C0F47DFE3869")

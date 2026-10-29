@@ -20,6 +20,7 @@ final class DesknetAppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.mainMenu = makeMainMenu()
+        DesknetAgentInstaller.install()
 
         runningApps.start()
         let controller = DesknetWindowController(
@@ -42,6 +43,7 @@ final class DesknetAppDelegate: NSObject, NSApplicationDelegate {
         if listener.start() != .listening {
             showListenerAlert()
         }
+        Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { _ in listener.repairIfNeeded() }
 
         shortcutMonitor.start { controller.toggleDesknetWindow() }
         controller.showDesknetWindow()
