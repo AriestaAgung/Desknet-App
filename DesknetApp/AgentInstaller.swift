@@ -12,6 +12,9 @@ enum DesknetAgentInstaller {
         if let agent = bundle.privateFrameworksURL?.appendingPathComponent("DesknetAgent.framework") {
             replace(supportURL.appendingPathComponent("Agent/macosx/DesknetAgent.framework"), with: agent)
         }
+        if let agent = bundle.resourceURL?.appendingPathComponent("Agent/iphonesimulator/DesknetAgent.framework") {
+            replace(supportURL.appendingPathComponent("Agent/iphonesimulator/DesknetAgent.framework"), with: agent)
+        }
         if let hook = bundle.url(forResource: "desknet_hook", withExtension: "py") {
             replace(supportURL.appendingPathComponent("desknet_hook.py"), with: hook)
         }

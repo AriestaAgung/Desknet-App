@@ -93,6 +93,7 @@
 				000000000000000130000000 /* Frameworks */,
 				000000000000000140000000 /* Resources */,
 				000000000000000320000000 /* Embed Frameworks */,
+				000000000000000340000000 /* Build Simulator Agent */,
 			);
 			buildRules = (
 			);
@@ -166,6 +167,20 @@
 			);
 		};
 /* End PBXResourcesBuildPhase section */
+
+/* Begin PBXShellScriptBuildPhase section */
+		000000000000000340000000 /* Build Simulator Agent */ = {
+			isa = PBXShellScriptBuildPhase;
+			buildActionMask = 2147483647;
+			files = ();
+			inputPaths = ("$(SRCROOT)/DesknetAgent/DesknetAgent.swift", "$(SRCROOT)/DesknetAgent/DesknetAgentBootstrap.m",);
+			name = "Build Simulator Agent";
+			outputPaths = ("$(TARGET_BUILD_DIR)/$(UNLOCALIZED_RESOURCES_FOLDER_PATH)/Agent/iphonesimulator/DesknetAgent.framework/DesknetAgent",);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "# Simulator build of the agent, shipped in Resources and installed by DesknetAgentInstaller.\n# ponytail: arm64 only (Apple silicon); add x86_64 to the -target list for Intel Macs.\nset -e\nSDK=$(xcrun --sdk iphonesimulator --show-sdk-path)\nTRIPLE=arm64-apple-ios16.0-simulator\nOUT=\"$TARGET_BUILD_DIR/$UNLOCALIZED_RESOURCES_FOLDER_PATH/Agent/iphonesimulator/DesknetAgent.framework\"\nOBJ=\"$DERIVED_FILE_DIR/agent-sim\"\nmkdir -p \"$OUT\" \"$OBJ\"\nxcrun --sdk iphonesimulator clang -c -fobjc-arc -target $TRIPLE -isysroot \"$SDK\" \"$SRCROOT/DesknetAgent/DesknetAgentBootstrap.m\" -o \"$OBJ/bootstrap.o\"\nxcrun --sdk iphonesimulator swiftc -emit-library -target $TRIPLE -sdk \"$SDK\" -module-name DesknetAgent -module-cache-path \"$OBJ/ModuleCache\" \"$SRCROOT/DesknetAgent/DesknetAgent.swift\" \"$OBJ/bootstrap.o\" -Xlinker -install_name -Xlinker @rpath/DesknetAgent.framework/DesknetAgent -o \"$OUT/DesknetAgent\"\n/usr/libexec/PlistBuddy -c \"Clear dict\" -c \"Add :CFBundleExecutable string DesknetAgent\" -c \"Add :CFBundleIdentifier string dev.desknet.agent\" -c \"Add :CFBundlePackageType string FMWK\" -c \"Add :CFBundleSupportedPlatforms array\" -c \"Add :CFBundleSupportedPlatforms:0 string iPhoneSimulator\" \"$OUT/Info.plist\" >/dev/null 2>&1 || /usr/libexec/PlistBuddy -c \"Add :CFBundleExecutable string DesknetAgent\" -c \"Add :CFBundleIdentifier string dev.desknet.agent\" -c \"Add :CFBundlePackageType string FMWK\" -c \"Add :CFBundleSupportedPlatforms array\" -c \"Add :CFBundleSupportedPlatforms:0 string iPhoneSimulator\" \"$OUT/Info.plist\"\ncodesign --force --sign - --timestamp=none \"$OUT\"\n";
+		};
+/* End PBXShellScriptBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
 		000000000000000120000000 /* Sources */ = {
@@ -324,6 +339,7 @@
 		000000000000000111000000 /* Debug configuration for PBXNativeTarget "DesknetApp" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = R2D4D7YLB2;
@@ -348,6 +364,7 @@
 		000000000000000112000000 /* Release configuration for PBXNativeTarget "DesknetApp" */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				ENABLE_USER_SCRIPT_SANDBOXING = NO;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DEVELOPMENT_TEAM = R2D4D7YLB2;

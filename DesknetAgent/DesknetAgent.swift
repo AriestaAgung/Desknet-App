@@ -239,7 +239,9 @@ private final class DesknetAgentSender: @unchecked Sendable {
     }
 
     private func flush() {
-        if fd < 0 { fd = DesknetAgentSocket.connect(path: NSHomeDirectory() + "/Library/Caches/desknet.sock") ?? -1 }
+        // Simulator apps have their own home; the host's comes in SIMULATOR_HOST_HOME.
+        let home = ProcessInfo.processInfo.environment["SIMULATOR_HOST_HOME"] ?? NSHomeDirectory()
+        if fd < 0 { fd = DesknetAgentSocket.connect(path: home + "/Library/Caches/desknet.sock") ?? -1 }
         guard fd >= 0 else { return }
         while let entry = pending.first {
             guard let data = try? JSONEncoder().encode(DesknetAgentMessage.entry(entry)) + Data([0x0A]), DesknetAgentSocket.write(data, fd: fd) else {
