@@ -135,12 +135,12 @@ These were tested directly in this session.
 9. **LLDB injection works:**
    - `simctl launch --wait-for-debugger` → `process attach` → break at `main` → `process load <dylib>` loads it. The target triple is `arm64-apple-ios-simulator`.
    - A **one-shot `UIApplicationMain` breakpoint set on LLDB's dummy target** is inherited by the attached target. Its Python callback ran `SBProcess.LoadImage` and returned `False`, so the app kept running.
-   - Tested on MandiriCoinTicker, a SwiftUI app. Prototype: [`../prototypes/desknet_hook.py`](../prototypes/desknet_hook.py).
+   - Tested on MandiriCoinTicker, a SwiftUI app. The current hook is `DesknetApp/desknet_hook.py`.
    - That breakpoint-callback version works in CLI `lldb` only. Inside Xcode it hangs the app (item 11).
 
 **Capture**
 
-10. `URLProtocol.registerClass` only covers `URLSession.shared`. Moya and Alamofire need `URLSessionConfiguration.default` and `.ephemeral` to be hooked as well. That hook exists in the Desknet repo but isn't committed yet.
+10. `URLProtocol.registerClass` only covers `URLSession.shared`. Moya and Alamofire need `URLSessionConfiguration.default` and `.ephemeral` to be hooked as well. The agent hooks both (`DesknetAgent/DesknetAgent.swift`).
 
 **Phase 0 spikes** (Xcode 27.1, iPhone 18 Pro iOS 27.0, MandiriCoinTicker run with `⌘R`)
 
@@ -156,7 +156,7 @@ These were tested directly in this session.
 12. **0.2 Late load still captures.**
     - Test setup:
       - A throwaway copy of MandiriCoinTicker with `Desknet-iOS` removed and the bundle ID changed to `….dnspike`. Built in `/tmp`, then deleted.
-      - A spike agent: the `DesknetCore` and `Desknet-iOS` sources, plus a C constructor that calls `Desknet.shared.start()` ([`../prototypes/agent_start.swift`](../prototypes/agent_start.swift), [`agent_start.c`](../prototypes/agent_start.c)).
+      - A spike agent: the `DesknetCore` and `Desknet-iOS` sources, plus a C constructor that calls `Desknet.shared.start()`.
       - The agent was injected through the same stop hook from CLI `lldb`, and a Python listener stood in for Desknet.app.
     - Result: both Moya `/data/top/totaltoptiervolfull` pages (`page=1`, `page=2`) reached the socket, so the `URLProtocol` + configuration hook is enough for this app. **No switch to `resume` swizzling yet.** Sessions created before `UIApplicationMain` weren't tested.
     - The first entry arrived **twice with the same ID**. The client connects on its first send, replays the store, and then sends the same entry again. The viewer-side `Set<UUID>` check (task 1.5) is needed.
@@ -189,8 +189,8 @@ These were tested directly in this session.
     - **Test targets:**
       - `BPSpikeMac`: hardened runtime, sandbox, `network.client`.
       - `BPSpikeiOS`: runs on the iPhone 11 Pro `00008030-000428C40C98802E`, iOS device.
-    - **Agent:** [`../prototypes/agent_framework.m`](../prototypes/agent_framework.m), built by [`build_agent_framework.sh`](../prototypes/build_agent_framework.sh) into `~/Library/Application Support/Desknet/Agent/{iphoneos,macosx}/DesknetAgent.framework`.
-    - **Build phase:** [`../prototypes/desknet_build_phase.sh`](../prototypes/desknet_build_phase.sh), placed after compile.
+    - **Agent:** a minimal Objective-C framework installed at `~/Library/Application Support/Desknet/Agent/{iphoneos,macosx}/DesknetAgent.framework`.
+    - **Build phase:** the snippet in DESIGN.md → Build-phase mode, placed after compile.
     - **Step 1, the build phase itself:**
       - It copies the framework into `$FRAMEWORKS_FOLDER_PATH` and signs it with `$EXPANDED_CODE_SIGN_IDENTITY`. It skips when `CONFIGURATION` isn't `Debug` or the platform is the Simulator.
       - The embedded agent ends up with the app's Team ID on both platforms.
@@ -216,6 +216,14 @@ These were tested directly in this session.
       - While the agent listened on loopback and the app made requests, no Local Network prompt appeared (one device screenshot).
       - `Info.plist` was byte-for-byte the same with and without the agent, so no plist change is needed.
       - Still to check: whether a prompt appears once the Mac connects through usbmuxd.
+19. **Injected agent, end to end** (2026-10-29, `DesknetAgent.framework` from this repo):
+    - **Mac app with hardened runtime, run from Xcode:** Cleano-Dev (team `R2D4D7YLB2`) loaded the agent from `~/Library/Application Support/Desknet/Agent/macosx/` with no project change, and its requests showed in Desknet.app.
+      - It loads because Xcode signs the agent while building Desknet.app, with the same team as the app. Library validation only accepts the same Team ID, so a Mac app from another team still needs build-phase mode.
+      - The same load also worked from CLI `lldb` on a throwaway hardened app.
+    - **Simulator app without the SDK:** MandiriCoinTicker, run from Xcode, loaded the Simulator build of the agent and its requests showed in Desknet.app. The agent finds the socket through `SIMULATOR_HOST_HOME`.
+    - **Agent and SDK capture in one process:** with Desknet's `DesknetRuntime.startCapture()` running, the request still returned `200`, the SDK captured it, and the agent sent it. No recursion, because the agent's swizzled selectors (`desknetAgentDefault`, `desknetAgentEphemeral`) differ from the SDK's. Item 14 was the same agent loaded twice.
+    - **Bug found and fixed:** the agent's `stopLoading` called `task?.cancel()`. In a `URLProtocol` subclass `task` is the caller's own task, so every captured request failed with `-999 cancelled`. It now cancels its own `dataTask`.
+    - **The viewer can lose its socket.** If another process deletes or replaces `~/Library/Caches/desknet.sock`, the running viewer stays open but can't be reached, and the hook then skips with "Desknet.app not running". The listener now re-creates the socket within 2 seconds.
 
 ## What we take from RocketSim
 
@@ -225,7 +233,7 @@ These were tested directly in this session.
 | Module-load observer + run to `UIApplicationMain` | `UIApplicationMain` breakpoint + scripted stop hook (spike 0.1: breakpoint callbacks don't run under Xcode) | ~80 lines, verified in Xcode 27.1; theirs handles more races |
 | Skip previews, test runners, XCTest modules | Same gates | Without them the agent loads into SwiftUI Previews and unit tests |
 | Turn off `parallel-module-load`, `preload-symbols`, dyld notify breakpoint around `LoadImage` | Same, if spike 0.1 shows hangs | They hit real hangs here; ours hasn't yet |
-| Framework inside the app bundle | `libDesknetAgent.dylib` inside `Desknet.app` | Agent version always matches the app |
+| Framework inside the app bundle | `DesknetAgent.framework` inside `Desknet.app`, copied to Application Support on launch | Agent version always matches the app |
 | Bonjour, app side listens (`_rocketsim._tcp`) | Unix socket at a fixed path | We're not sandboxed; already working; no Local Network prompt |
 | Swizzle `__NSCFURLSessionTask` `resume` | Keep `URLProtocol` + configuration hook | Spike 0.2 captured Moya with a late load; revisit if an app makes sessions before `UIApplicationMain` |
 | Debug-code fallback | `Desknet-iOS` SDK, or a "Launch with Desknet" button | Covers apps run without the debugger |

@@ -11,8 +11,8 @@ The user installs one Mac app and does nothing else. Every iOS Simulator app the
 | Client | Desknet.app running | Not running |
 | --- | --- | --- |
 | iOS Simulator app run from **Xcode** (debugger on), no project change | Agent injected by LLDB → Desknet.app | Not injected (recommended, see open question 1) |
-| Mac app without hardened runtime, run from Xcode, no project change | Agent injected by LLDB (copied into the app's container first if it's sandboxed) → Desknet.app | Not injected |
-| Mac app with hardened runtime | **Build-phase mode** → Desknet.app | Agent loaded, sends nothing |
+| Mac app run from Xcode, signed by the same team as Desknet.app (hardened runtime included), no project change | Agent injected by LLDB → Desknet.app | Not injected |
+| Sandboxed Mac app, or one signed by another team | **Build-phase mode** → Desknet.app | Agent loaded, sends nothing |
 | Real iOS device | **Build-phase mode** → Desknet.app over USB (usbmuxd) | Agent loaded, sends nothing |
 | iOS Simulator app launched from Desknet.app's "Launch with Desknet" | Desknet.app | n/a |
 
@@ -26,10 +26,10 @@ The user installs one Mac app and does nothing else. Every iOS Simulator app the
 
 ```
 Simulator app ──(SDK or injected agent)── NDJSON over Unix socket ──► Desknet.app
-                                                                     ├─ DesknetHost listener
+                                                                     ├─ DesknetBridgeListener
 Mac app ──(Desknet SDK)── same socket ─────────────────────────────►├─ store, grouped by source
-                                                                     └─ window + menu bar item
-Xcode Run ── ~/.lldbinit-Xcode block ── desknet hook script ── process load libDesknetAgent.dylib
+                                                                     └─ window
+Xcode Run ── ~/.lldbinit-Xcode block ── desknet_hook.py ── process load DesknetAgent.framework
 ```
 
 ## Transport
@@ -61,28 +61,27 @@ This mirrors RocketSim Connect (see [RESEARCH.md](RESEARCH.md)).
    # END Desknet Xcode Hook
    ```
    Desknet only ever edits the text between its own markers; everything else in the file is left alone.
-2. **On every launch, Desknet.app rewrites `desknet_hook.py`** with the current agent path. That repairs the hook when the app moves or updates.
+2. **On every launch, Desknet.app copies `desknet_hook.py` and the agents** (`Agent/macosx`, `Agent/iphonesimulator`) from its bundle into `~/Library/Application Support/Desknet/`. That repairs the hook when the app moves or updates.
 3. **In each Xcode debug session**, the hook script:
-   - sets a plain `UIApplicationMain` breakpoint and a scripted stop hook (`target stop-hook add -P`) on LLDB's dummy target. Every new debug target inherits both.
-     - Breakpoint script callbacks don't run under Xcode 27's `lldb-rpc-server`, and breakpoint names aren't inherited (spike 0.1). So the stop hook recognises our stop by frame 0 being `UIApplicationMain`.
+   - sets plain `UIApplicationMain` and `NSApplicationMain` breakpoints and a scripted stop hook (`target stop-hook add -P`) on LLDB's dummy target. Every new debug target inherits both.
+     - Breakpoint script callbacks don't run under Xcode 27's `lldb-rpc-server`, and breakpoint names aren't inherited (spike 0.1). So the stop hook recognises our stop by frame 0's base name, which also matches the Swift overlay `AppKit.NSApplicationMain(…)`.
      - It deletes the breakpoint once it has injected. Any exception must be caught, or the app stays stopped.
    - in the stop hook, checks that:
-     - the target triple contains `-simulator`;
-     - the executable sits directly in a `.app`;
-     - it isn't a SwiftUI Preview (`/previews/` in the path, or `XCODE_RUNNING_FOR_PREVIEWS=1`);
-     - it isn't a test runner (`xctrunner`, `XCTestConfigurationFilePath`, or loaded XCTest modules);
-     - the agent file exists;
+     - the executable is a Simulator `.app` (triple contains `-simulator`) or a Mac `.app/Contents/MacOS/` binary, or the app embeds the agent (build-phase mode);
+     - it isn't a SwiftUI Preview, a test runner or Desknet.app itself (`/previews/`, `XCPreviewAgent`, `-Runner.app/`, `.xctest/`, `/Desknet.app/` in the path);
+     - the agent isn't already loaded (weak-linked);
+     - the agent file for that platform exists;
      - the socket accepts a connection (that is, Desknet.app is running);
    - only then calls `SBProcess.LoadImage(agent)`;
    - returns `False` so the app auto-continues, unless a user breakpoint also hit `UIApplicationMain`.
 
-   The prototype is [`../prototypes/desknet_hook.py`](../prototypes/desknet_hook.py). It has the simulator gate only; the preview, test-runner and socket checks are still to do.
+   The hook is `DesknetApp/desknet_hook.py`. It has the preview, test-runner and socket checks. Not yet: `XCODE_RUNNING_FOR_PREVIEWS` and loaded-XCTest checks; it matches on the executable path instead.
    Xcode 27.1 reads only `~/.lldbinit-Xcode`. Keep writing `~/.lldbinit-lldb-rpc-server` too, for parity with RocketSim and other Xcode versions; the script installs once per debugger.
 4. **What the agent does on load:**
-   - Gate 1: returns immediately unless the bundle path contains `/Containers/Bundle/Application/`.
-   - Gate 2: returns if the app links the SDK. The SDK exports a C marker such as `@_cdecl("desknet_sdk_present")`, and the agent checks for it with `dlsym(RTLD_DEFAULT, …)`. **Required** (spike 0.4): without it, both copies exchange the session-configuration methods and the main thread recurses forever.
-   - Then it runs the `Desknet-iOS` start path: capture, the `⌘⌃Z` hook, and the bridge client with `via: agent`.
-   - It has no fallback sheet. Agent apps only ever use Desknet.app.
+   - An Objective-C `+load` calls `desknet_agent_start()` once.
+   - It returns if `dlsym(RTLD_DEFAULT, "desknet_sdk_present")` finds the SDK marker. The SDK doesn't export that marker yet, so for now both run side by side. That's safe because the agent's swizzled selectors have their own names (RESEARCH.md item 19), but a Simulator app that links `Desknet-iOS` shows each request twice.
+   - Then it registers its `URLProtocol`, hooks `URLSessionConfiguration.default`/`.ephemeral`, and sends each finished request to the socket. Up to 500 are kept while Desknet.app is unreachable.
+   - It has no `⌘⌃Z` hook and no fallback UI. Agent apps only ever use Desknet.app.
 5. **Uninstall:** Settings → Xcode Integration → Remove deletes the managed block and the script.
 
 Fallback launch paths for apps run without the debugger:
@@ -127,10 +126,10 @@ Rejected option: setting `launchctl setenv DYLD_INSERT_LIBRARIES` across the who
 
 ## Mac app UI
 
-- **Sidebar of sources:** one per `hello` (app, device, pid), plus an "All" entry. It fixes logs from different apps getting mixed (backlog item).
-- **Detail view:** reuses `DesknetMonitorRootView`, moved into the public `DesknetHost` product.
+- **Sidebar "Apps from Xcode":** one row per app launched or debugged from Xcode (found by process scan and peer PID), plus "All apps". Will move to `hello` source info with protocol v2.
+- **Detail view:** `DesknetMonitorRootView`, ported into `DesknetApp/MonitorView.swift`.
 - **Window behaviour:**
-  - The window opens on `⌘⌃Z` from any client, a Dock click (`applicationShouldHandleReopen`) or the menu bar item.
+  - The window opens on `⌘⌃Z` from any client, a Dock click (`applicationShouldHandleReopen`) or Logs → Show Logs (`⌘L`). A menu bar item isn't built yet.
   - `⌘⌃Z` while Desknet.app is focused hides it.
   - No global hotkey: it would swallow the key before the Simulator gets it.
 - **Settings:** Xcode Integration (status, Install/Repair/Remove, last-injected app), the socket path, and Clear logs.
@@ -140,7 +139,7 @@ Rejected option: setting `launchctl setenv DYLD_INSERT_LIBRARIES` across the who
 
 - The socket is owner-only. Other users on the Mac can't connect, but any process running as the same user can. That's acceptable for a debug tool; document it.
 - Nothing leaves the Mac, and there are no network listeners.
-- The agent only loads into Simulator apps run under Xcode's debugger, or through the explicit launch paths. Real-device and release builds are never touched.
+- The agent only loads into Simulator and Mac apps run under Xcode's debugger while Desknet.app is running, or through the explicit launch paths. Real-device and release builds are never touched unless the user adds the build phase.
 - Logs can contain tokens and personal data. Keep them in memory only; add export redaction later.
 
 ## Distribution (decided: unnotarized for now)
