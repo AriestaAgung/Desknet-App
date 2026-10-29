@@ -28,6 +28,18 @@ final class DesknetMonitorViewModel: ObservableObject {
     @Published private(set) var entries: [NetworkLogEntry] = []
     @Published var selectedEntryID: UUID?
     @Published var collapsedSections: Set<DetailSection> = [.requestHeaders, .responseHeaders]
+    /// App picked in the apps column; nil shows every app's requests.
+    /// ponytail: keyed by PID, so a relaunch from Xcode is a new row to pick.
+    @Published var selectedPID: pid_t? {
+        didSet {
+            guard oldValue != selectedPID else { return }
+            selectedEntryID = nil
+            reload()
+        }
+    }
+    @Published private(set) var connectedPIDs: Set<pid_t> = []
+    @Published private(set) var countsByPID: [pid_t: Int] = [:]
+    @Published private(set) var totalCount = 0
 
     private let store: DesknetStore
     private var observer: NSObjectProtocol?
@@ -76,7 +88,12 @@ final class DesknetMonitorViewModel: ObservableObject {
     }
 
     var emptyStateText: String {
-        entries.isEmpty ? "No requests found." : "Select an API call from the list to view request/response details."
+        guard entries.isEmpty else { return "Select an API call from the list to view request/response details." }
+        if selectedPID != nil, query.isEmpty {
+            // Until the agent ships, only apps with the Desknet-iOS SDK send logs (PLAN 1.3).
+            return "This app hasn't sent any requests. For now, only apps that link the Desknet-iOS SDK send logs."
+        }
+        return "No requests found."
     }
 
     func clear() {
@@ -84,7 +101,10 @@ final class DesknetMonitorViewModel: ObservableObject {
     }
 
     func reload() {
-        allEntries = store.snapshot()
+        allEntries = store.snapshot(pid: selectedPID)
+        connectedPIDs = store.connectedPIDs()
+        countsByPID = store.countsByPID()
+        totalCount = store.count()
         applyFilterAndSelection()
     }
 

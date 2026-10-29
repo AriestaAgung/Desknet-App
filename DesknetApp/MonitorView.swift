@@ -3,12 +3,15 @@ import SwiftUI
 /// Desknet's macOS monitor: header, request list on the left, details on the right.
 struct DesknetMonitorRootView: View {
     @ObservedObject var viewModel: DesknetMonitorViewModel
+    @ObservedObject var runningApps: RunningAppsMonitor
 
     var body: some View {
         VStack(spacing: 0) {
             headerView
             Divider()
             HSplitView {
+                RunningAppsView(monitor: runningApps, viewModel: viewModel)
+                    .frame(minWidth: 200, idealWidth: 240, maxWidth: 320)
                 sidebarView
                     .frame(minWidth: 280, idealWidth: 340, maxWidth: 420)
                 detailView

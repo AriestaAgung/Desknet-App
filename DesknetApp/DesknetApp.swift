@@ -1,6 +1,7 @@
 import AppKit
 
 @main
+@MainActor
 final class DesknetAppDelegate: NSObject, NSApplicationDelegate {
     private static let delegate = DesknetAppDelegate()
 
@@ -13,13 +14,18 @@ final class DesknetAppDelegate: NSObject, NSApplicationDelegate {
 
     private let store = DesknetStore()
     private let shortcutMonitor = DesknetShortcutMonitor()
+    private let runningApps = RunningAppsMonitor()
     private var windowController: DesknetWindowController?
     private var listener: DesknetBridgeListener?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         NSApp.mainMenu = makeMainMenu()
 
-        let controller = DesknetWindowController(viewModel: DesknetMonitorViewModel(store: store))
+        runningApps.start()
+        let controller = DesknetWindowController(
+            viewModel: DesknetMonitorViewModel(store: store),
+            runningApps: runningApps
+        )
         windowController = controller
 
         let listener = DesknetBridgeListener(store: store) { message in

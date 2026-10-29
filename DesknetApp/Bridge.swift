@@ -148,9 +148,21 @@ final class DesknetBridgeListener: @unchecked Sendable {
         listenFD = nil
     }
 
+    /// The connecting process. Simulator apps are ordinary Mac processes, so this
+    /// matches `RunningApp.pid` without any change to the wire format.
+    static func peerPID(_ fd: Int32) -> pid_t? {
+        var pid: pid_t = 0
+        var length = socklen_t(MemoryLayout<pid_t>.size)
+        guard getsockopt(fd, SOL_LOCAL, LOCAL_PEERPID, &pid, &length) == 0, pid > 0 else { return nil }
+        return pid
+    }
+
     private func read(_ fd: Int32) {
         defer { close(fd) }
-        DesknetDiagnostics.log("Bridge", "client connected")
+        let pid = Self.peerPID(fd)
+        if let pid { store.setConnected(true, pid: pid) }
+        defer { if let pid { store.setConnected(false, pid: pid) } }
+        DesknetDiagnostics.log("Bridge", "client connected pid=\(pid.map(String.init) ?? "-")")
 
         var pending = Data()
         var chunk = [UInt8](repeating: 0, count: 64 * 1024)
@@ -163,7 +175,7 @@ final class DesknetBridgeListener: @unchecked Sendable {
             while let newline = pending.firstIndex(of: 0x0A) {
                 let line = pending[pending.startIndex..<newline]
                 pending.removeSubrange(pending.startIndex...newline)
-                handle(line)
+                handle(line, pid: pid)
             }
             if pending.count > Self.maxLineBytes {
                 DesknetDiagnostics.log("Bridge", "dropping client: line over \(Self.maxLineBytes) bytes")
@@ -173,13 +185,13 @@ final class DesknetBridgeListener: @unchecked Sendable {
         DesknetDiagnostics.log("Bridge", "client disconnected")
     }
 
-    func handle(_ line: Data) {
+    func handle(_ line: Data, pid: pid_t? = nil) {
         guard let message = try? JSONDecoder().decode(DesknetBridgeMessage.self, from: line) else {
             DesknetDiagnostics.log("Bridge", "dropped undecodable message bytes=\(line.count)")
             return
         }
         if case let .entry(entry) = message {
-            store.insert(entry)
+            store.insert(entry, from: pid)
         } else {
             onCommand(message)
         }

@@ -2,10 +2,10 @@ import AppKit
 import SwiftUI
 
 final class DesknetWindowController: NSWindowController {
-    private let defaultFrame = NSRect(x: 180, y: 160, width: 1180, height: 760)
-    private let minimumWindowSize = NSSize(width: 980, height: 620)
+    private let defaultFrame = NSRect(x: 140, y: 160, width: 1420, height: 780)
+    private let minimumWindowSize = NSSize(width: 1100, height: 620)
 
-    init(viewModel: DesknetMonitorViewModel) {
+    init(viewModel: DesknetMonitorViewModel, runningApps: RunningAppsMonitor) {
         let window = NSWindow(
             contentRect: defaultFrame,
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
@@ -14,7 +14,9 @@ final class DesknetWindowController: NSWindowController {
         )
         window.title = "Desknet Network Logs"
         window.minSize = minimumWindowSize
-        window.contentViewController = NSHostingController(rootView: DesknetMonitorRootView(viewModel: viewModel))
+        window.contentViewController = NSHostingController(
+            rootView: DesknetMonitorRootView(viewModel: viewModel, runningApps: runningApps)
+        )
         window.isReleasedWhenClosed = false
         window.setFrameAutosaveName("Desknet.Window.v2")
 
