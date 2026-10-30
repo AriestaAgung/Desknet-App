@@ -1,24 +1,28 @@
-# Desknet.app
+# Desknet App (Previously Desknet)
 
-A Mac app that shows the network requests of apps you run from Xcode, on the iOS Simulator and on the Mac. You don't add a package or change code in your project.
+Desknet is evolving! It's now a macOS app that shows the network requests of apps you run from Xcode, on the iOS Simulator and on the Mac. You don't add a package or change code in your project. Want a surprise? Try to run on a device and check out are we capturing or not 😎
+
+![](Adobe%20Express%20-%20Screen%20Recording%202026-10-30%20at%2016.20.53.gif)
 
 Run Desknet, press ⌘R in Xcode, and the app's `URLSession` requests appear in the Desknet window with headers, bodies, status and timing.
 
 ## What it captures
 
-| App | Captured | Project change |
-| --- | --- | --- |
-| iOS Simulator app run from Xcode | Yes | None |
-| Mac app run from Xcode, signed by the same team as your Desknet build | Yes, hardened runtime included | None |
-| App that links the `Desknet-iOS` SDK | Yes | None (the SDK sends its own logs) |
-| Sandboxed Mac app | No | Set `ENABLE_APP_SANDBOX = NO` for Debug, or wait for build-phase mode |
-| Mac app signed by another team | No | Build-phase mode, not built yet |
-| Real iPhone or iPad | No | Build-phase mode, not built yet |
-| App launched without the debugger (home screen, Finder, "Debug executable" off) | No | Needs the SDK |
+
+| App                                                                             | Captured                       | Project change                                                        |
+| ------------------------------------------------------------------------------- | ------------------------------ | --------------------------------------------------------------------- |
+| iOS Simulator app run from Xcode                                                | Yes                            | None                                                                  |
+| Mac app run from Xcode, signed by the same team as your Desknet build           | Yes, hardened runtime included | None                                                                  |
+| App that links the `Desknet-iOS` SDK                                            | Yes                            | None (the SDK sends its own logs)                                     |
+| Sandboxed Mac app                                                               | No                             | Set `ENABLE_APP_SANDBOX = NO` for Debug, or wait for build-phase mode |
+| Mac app signed by another team                                                  | No                             | Build-phase mode, not built yet                                       |
+| Real iPhone or iPad                                                             | No                             | Build-phase mode, not built yet                                       |
+| App launched without the debugger (home screen, Finder, "Debug executable" off) | No                             | Needs the SDK                                                         |
+
 
 New macOS projects from Xcode's template are sandboxed by default. The agent loads into them but can't reach Desknet's socket, so nothing shows up.
 
-Only `URLSession` traffic is captured, including Alamofire and Moya. WebSockets, `Network.framework`, raw sockets and `WKWebView` aren't.
+Only `URLSession` traffic is captured, including Alamofire and Moya. WebSockets, `Network.framework`, raw sockets and `WKWebView` aren't currently captured.
 
 ## Requirements
 
@@ -29,7 +33,7 @@ Only `URLSession` traffic is captured, including Alamofire and Moya. WebSockets,
 ## Build and run
 
 1. Open `DesknetApp.xcodeproj`.
-2. In the `DesknetApp` target → Signing & Capabilities, choose your team. The project is set to team `R2D4D7YLB2`.
+2. In the `DesknetApp` target → Signing &amp; Capabilities, choose your team. The project is set to team `R2D4D7YLB2`.
 3. Run the `DesknetApp` scheme. It builds `Desknet.app` and both agents.
 
 From the terminal:
@@ -64,11 +68,13 @@ In the window:
 - Select a request to see its endpoint, status, duration, sizes, request and response headers, and bodies. JSON bodies are pretty-printed. Each header and body has a Copy button.
 - Requests that fail without a response show as **Failed**.
 
-| Shortcut | Action |
-| --- | --- |
-| ⌘⌃Z | Show or hide the window. Also works from apps that link the SDK. |
-| ⌘L | Show Logs |
-| ⌘K | Clear Logs |
+
+| Shortcut | Action                                                           |
+| -------- | ---------------------------------------------------------------- |
+| ⌘⌃Z      | Show or hide the window. Also works from apps that link the SDK. |
+| ⌘L       | Show Logs                                                        |
+| ⌘K       | Clear Logs                                                       |
+
 
 Logs stay in memory only and are gone when Desknet quits. Start Desknet before the app you want to capture: the hook loads the agent only when Desknet is running, and only at app launch.
 
@@ -92,12 +98,14 @@ Mac apps with hardened runtime accept the agent because Xcode signs it with your
 
 `~/Library/Application Support/Desknet/hook.log` has one line per launch:
 
-| Line | Meaning |
-| --- | --- |
-| `load exe=… error=None` | Agent loaded |
-| `skip … Desknet.app not running` | Desknet wasn't listening. Start it, then rerun the app |
-| `skip … no agent` | No agent for that platform. Run Desknet once so it installs the agents |
-| no line for your run | The hook didn't load. Check the block in `~/.lldbinit-Xcode` |
+
+| Line                             | Meaning                                                                |
+| -------------------------------- | ---------------------------------------------------------------------- |
+| `load exe=… error=None`          | Agent loaded                                                           |
+| `skip … Desknet.app not running` | Desknet wasn't listening. Start it, then rerun the app                 |
+| `skip … no agent`                | No agent for that platform. Run Desknet once so it installs the agents |
+| no line for your run             | The hook didn't load. Check the block in `~/.lldbinit-Xcode`           |
+
 
 - **App listed but no requests:** the app was probably started before Desknet. Rerun it from Xcode.
 - **Each request shows twice:** the Simulator app also links `Desknet-iOS`. The agent can't detect the SDK yet. Remove the SDK, or ignore the copies.
@@ -111,13 +119,15 @@ Mac apps with hardened runtime accept the agent because Xcode signs it with your
 
 ## Project layout
 
-| Path | Contents |
-| --- | --- |
-| `DesknetApp/` | The Mac app: window and views, view model, store, socket listener, app scanner, agent installer |
-| `DesknetApp/desknet_hook.py` | LLDB hook, shipped in the app's Resources |
-| `DesknetAgent/` | The agent: capture, socket client and an Objective-C `+load` entry point. Built for macOS by its own target, and for the Simulator by the app target's "Build Simulator Agent" phase |
-| `Checks/main.swift` | Self-check for the wire format, store, app detection and socket repair |
-| `docs/` | Design, plan and research notes |
+
+| Path                         | Contents                                                                                                                                                                             |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `DesknetApp/`                | The Mac app: window and views, view model, store, socket listener, app scanner, agent installer                                                                                      |
+| `DesknetApp/desknet_hook.py` | LLDB hook, shipped in the app's Resources                                                                                                                                            |
+| `DesknetAgent/`              | The agent: capture, socket client and an Objective-C `+load` entry point. Built for macOS by its own target, and for the Simulator by the app target's "Build Simulator Agent" phase |
+| `Checks/main.swift`          | Self-check for the wire format, store, app detection and socket repair                                                                                                               |
+| `docs/`                      | Design, plan and research notes                                                                                                                                                      |
+
 
 ## Development
 
