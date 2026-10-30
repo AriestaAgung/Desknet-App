@@ -2,7 +2,7 @@ import Foundation
 
 /// Copies the bundled agent and LLDB hook to `~/Library/Application Support/Desknet/` on launch,
 /// so the hook always points at this build's agent.
-/// ponytail: the `~/.lldbinit-Xcode` block is installed by hand for now; Settings Install/Remove is PLAN 2.2.
+/// ponytail: the `~/.lldbinit-Xcode` block is installed by hand for now (see README); add a Settings Install/Remove button.
 enum DesknetAgentInstaller {
     static let supportURL = URL(fileURLWithPath: NSHomeDirectory())
         .appendingPathComponent("Library/Application Support/Desknet")
@@ -20,7 +20,7 @@ enum DesknetAgentInstaller {
         }
     }
 
-    /// Copy to a temp file, then swap it in. Overwriting a loaded binary in place breaks the next load (RESEARCH.md spike 0.3).
+    /// Copy to a temp file, then swap it in. Overwriting a loaded binary in place makes the next `LoadImage` fail.
     private static func replace(_ destination: URL, with source: URL) {
         let files = FileManager.default
         let temporary = destination.deletingLastPathComponent()

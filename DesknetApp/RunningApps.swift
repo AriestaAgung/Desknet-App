@@ -33,7 +33,7 @@ enum RunningAppScanner {
         let simulatorUDID: String?
     }
 
-    /// Decides whether a process is an app Xcode runs. Pure, so `Checks/main.swift` can test it.
+    /// Decides whether a process is an app Xcode runs. Pure, so it can be tested without real processes.
     static func classify(path: String, isTraced: Bool) -> Match? {
         // Previews and test runners are Xcode's own helpers, not the user's app.
         let helpers = ["XCPreviewAgent", "/previews/", "-Runner.app/", ".xctest/"]

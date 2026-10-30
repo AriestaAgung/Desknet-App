@@ -27,7 +27,7 @@ struct NetworkLogEntry: Identifiable, Sendable, Codable {
 }
 
 /// Entries received from connected apps, tagged with the process that sent them.
-/// ponytail: viewer side only. Capture (begin/response/finish) arrives with the agent target (PLAN 1.1).
+/// Viewer side only; capture lives in `DesknetAgent`.
 final class DesknetStore: @unchecked Sendable {
     private let lock = NSLock()
     private var entries: [NetworkLogEntry] = []
@@ -38,7 +38,7 @@ final class DesknetStore: @unchecked Sendable {
     private var connections: [pid_t: Int] = [:]
 
     /// Entries already stored are skipped, so a sender can replay its history after
-    /// reconnecting (the SDK also resends its first entry; see RESEARCH.md item 12).
+    /// reconnecting (the SDK also resends its first entry after connecting).
     func insert(_ entry: NetworkLogEntry, from pid: pid_t? = nil) {
         lock.lock()
         let isNew = ids.insert(entry.id).inserted

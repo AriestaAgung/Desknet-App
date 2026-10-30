@@ -125,25 +125,13 @@ Mac apps with hardened runtime accept the agent because Xcode signs it with your
 | `DesknetApp/`                | The Mac app: window and views, view model, store, socket listener, app scanner, agent installer                                                                                      |
 | `DesknetApp/desknet_hook.py` | LLDB hook, shipped in the app's Resources                                                                                                                                            |
 | `DesknetAgent/`              | The agent: capture, socket client and an Objective-C `+load` entry point. Built for macOS by its own target, and for the Simulator by the app target's "Build Simulator Agent" phase |
-| `Checks/main.swift`          | Self-check for the wire format, store, app detection and socket repair                                                                                                               |
-| `docs/`                      | Design, plan and research notes                                                                                                                                                      |
 
 
 ## Development
 
-Run the self-check from the repo root:
-
-```shell
-swiftc -o /tmp/bridge_check DesknetApp/Store.swift DesknetApp/Bridge.swift DesknetApp/Diagnostics.swift DesknetApp/RunningApps.swift Checks/main.swift && /tmp/bridge_check
-```
-
-It prints `bridge_check: ok`.
-
 The wire format matches what the `Desknet-iOS` SDK sends today (`{"entry":{"_0":{…}}}`, `{"toggle":{}}`), so SDK apps keep working. Don't rename fields in `NetworkLogEntry`.
 
 ## Roadmap
-
-Full list in [docs/PLAN.md](docs/PLAN.md).
 
 - Settings → Xcode Integration: install and remove the hook block
 - Build-phase mode for real devices, sandboxed Mac apps and other teams' apps
@@ -153,9 +141,3 @@ Full list in [docs/PLAN.md](docs/PLAN.md).
 - "Launch with Desknet" for apps run without the debugger
 - An x86_64 Simulator agent for Intel Macs
 - Unnotarized release build (zip or DMG)
-
-## Docs
-
-- [docs/DESIGN.md](docs/DESIGN.md): how the pieces fit, transport and security
-- [docs/PLAN.md](docs/PLAN.md): tasks and their status
-- [docs/RESEARCH.md](docs/RESEARCH.md): what was tested on this Mac, and how RocketSim does it

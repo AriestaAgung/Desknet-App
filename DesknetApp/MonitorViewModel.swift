@@ -90,8 +90,8 @@ final class DesknetMonitorViewModel: ObservableObject {
     var emptyStateText: String {
         guard entries.isEmpty else { return "Select an API call from the list to view request/response details." }
         if selectedPID != nil, query.isEmpty {
-            // Until the agent ships, only apps with the Desknet-iOS SDK send logs (PLAN 1.3).
-            return "This app hasn't sent any requests. For now, only apps that link the Desknet-iOS SDK send logs."
+            // The agent only loads at launch, so an app started before Desknet sends nothing.
+            return "This app hasn't sent any requests. If it was started before Desknet, run it again from Xcode."
         }
         return "No requests found."
     }

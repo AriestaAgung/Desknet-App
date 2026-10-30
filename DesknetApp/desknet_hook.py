@@ -2,7 +2,7 @@
 Imported from ~/.lldbinit-Xcode and ~/.lldbinit-lldb-rpc-server; set on the dummy target so every new
 debug target inherits it. Desknet.app rewrites this file on every launch.
 
-Xcode 27's lldb-rpc-server never runs breakpoint script callbacks (RESEARCH.md item 11), so the
+Xcode 27's lldb-rpc-server never runs breakpoint script callbacks (the app just hangs), so the
 entry-point breakpoint carries no callback; a scripted stop hook injects and auto-continues."""
 import os
 import socket
