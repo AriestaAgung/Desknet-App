@@ -11,9 +11,12 @@ Run Desknet, press ⌘R in Xcode, and the app's `URLSession` requests appear in 
 | iOS Simulator app run from Xcode | Yes | None |
 | Mac app run from Xcode, signed by the same team as your Desknet build | Yes, hardened runtime included | None |
 | App that links the `Desknet-iOS` SDK | Yes | None (the SDK sends its own logs) |
-| Mac app signed by another team, or sandboxed | No | Build-phase mode, not built yet |
+| Sandboxed Mac app | No | Set `ENABLE_APP_SANDBOX = NO` for Debug, or wait for build-phase mode |
+| Mac app signed by another team | No | Build-phase mode, not built yet |
 | Real iPhone or iPad | No | Build-phase mode, not built yet |
 | App launched without the debugger (home screen, Finder, "Debug executable" off) | No | Needs the SDK |
+
+New macOS projects from Xcode's template are sandboxed by default. The agent loads into them but can't reach Desknet's socket, so nothing shows up.
 
 Only `URLSession` traffic is captured, including Alamofire and Moya. WebSockets, `Network.framework`, raw sockets and `WKWebView` aren't.
 
