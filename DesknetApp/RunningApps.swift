@@ -100,6 +100,8 @@ enum RunningAppScanner {
 @MainActor
 final class RunningAppsMonitor: ObservableObject {
     @Published private(set) var apps: [RunningApp] = []
+    /// Polled with the apps, so installing or removing from the Hook menu shows within 2 seconds.
+    @Published private(set) var isHookInstalled = true
     private var timer: Timer?
 
     func start() {
@@ -113,13 +115,17 @@ final class RunningAppsMonitor: ObservableObject {
     private func refresh() {
         Task.detached(priority: .utility) { [weak self] in
             let apps = RunningAppScanner.scan()
-            await self?.update(apps)
+            let isHookInstalled = DesknetHookInstaller.isInstalled
+            await self?.update(apps, isHookInstalled: isHookInstalled)
         }
     }
 
-    private func update(_ apps: [RunningApp]) {
+    private func update(_ apps: [RunningApp], isHookInstalled: Bool) {
         if self.apps != apps {
             self.apps = apps
+        }
+        if self.isHookInstalled != isHookInstalled {
+            self.isHookInstalled = isHookInstalled
         }
     }
 }
