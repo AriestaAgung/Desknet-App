@@ -4,6 +4,15 @@ import SwiftUI
 struct RunningAppsView: View {
     @ObservedObject var monitor: RunningAppsMonitor
     @ObservedObject var viewModel: DesknetMonitorViewModel
+    @State private var showsHookInfo = false
+
+    private static let hookInfo = """
+        Without the hook, apps you run from Xcode don't send network logs to Desknet. They still show in this list, but with no requests. Apps that link the Desknet SDK still work.
+
+        To install, choose Hook ▸ Xcode Hook… and click Install, then restart Xcode.
+
+        To uninstall later, for example before deleting Desknet, choose Hook ▸ Xcode Hook… again and click Remove.
+        """
 
     var body: some View {
         VStack(alignment: .leading, spacing: 0) {
@@ -14,6 +23,29 @@ struct RunningAppsView: View {
                 .padding(.top, 14)
                 .padding(.bottom, 8)
                 .accessibilityAddTraits(.isHeader)
+
+            if !monitor.isHookInstalled {
+                Button {
+                    showsHookInfo.toggle()
+                } label: {
+                    Label("Xcode hook not installed", systemImage: "exclamationmark.triangle.fill")
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(.orange)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("Click for details")
+                .accessibilityHint("Shows what doesn't work without the hook")
+                .popover(isPresented: $showsHookInfo, arrowEdge: .trailing) {
+                    Text(Self.hookInfo)
+                        .font(.system(size: 12))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(width: 280, alignment: .leading)
+                        .padding(14)
+                }
+                .padding(.horizontal, 14)
+                .padding(.bottom, 8)
+            }
 
             ScrollView {
                 LazyVStack(spacing: 6) {
