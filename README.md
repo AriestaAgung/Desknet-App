@@ -46,7 +46,7 @@ On every launch, Desknet copies its agents and the LLDB hook into `~/Library/App
 
 ## One-time setup: the Xcode hook
 
-On launch, Desknet checks for the hook and offers to install it. Click **Install**, then restart Xcode. Later, use **Hook ▸ Xcode Hook…** to install or remove it.
+On launch, Desknet checks for the hook and offers to install it. Click **Install**, then restart Xcode. Later, use **Hook ▸ Xcode Hook…** to install or remove it. While the hook is missing, **Apps from Xcode** shows "Xcode hook not installed"; click it for details.
 
 Install adds this block to `~/.lldbinit-Xcode` and `~/.lldbinit-lldb-rpc-server`, creating the files if needed. Xcode 27.1 reads the first; the second is for other Xcode versions. Each file is backed up to `<file>.desknet-backup` before it changes.
 
@@ -104,7 +104,7 @@ Mac apps with hardened runtime accept the agent because Xcode signs it with your
 | `load exe=… error=None`          | Agent loaded                                                           |
 | `skip … Desknet.app not running` | Desknet wasn't listening. Start it, then rerun the app                 |
 | `skip … no agent`                | No agent for that platform. Run Desknet once so it installs the agents |
-| no line for your run             | The hook didn't load. Check the block in `~/.lldbinit-Xcode`           |
+| no line for your run             | The hook didn't load. Install it from **Hook ▸ Xcode Hook…**, then restart Xcode |
 
 
 - **App listed but no requests:** the app was probably started before Desknet. Rerun it from Xcode.
@@ -122,7 +122,7 @@ Mac apps with hardened runtime accept the agent because Xcode signs it with your
 
 | Path                         | Contents                                                                                                                                                                             |
 | ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `DesknetApp/`                | The Mac app: window and views, view model, store, socket listener, app scanner, agent installer                                                                                      |
+| `DesknetApp/`                | The Mac app: window and views, view model, store, socket listener, app scanner, agent and hook installers                                                                            |
 | `DesknetApp/desknet_hook.py` | LLDB hook, shipped in the app's Resources                                                                                                                                            |
 | `DesknetAgent/`              | The agent: capture, socket client and an Objective-C `+load` entry point. Built for macOS by its own target, and for the Simulator by the app target's "Build Simulator Agent" phase |
 
@@ -133,7 +133,6 @@ The wire format matches what the `Desknet-iOS` SDK sends today (`{"entry":{"_0":
 
 ## Roadmap
 
-- Settings → Xcode Integration: install and remove the hook block
 - Build-phase mode for real devices, sandboxed Mac apps and other teams' apps
 - Protocol v2 with a `hello` message carrying app and device info
 - An SDK marker so the agent stands down in apps that link `Desknet-iOS`
