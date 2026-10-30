@@ -46,15 +46,15 @@ On every launch, Desknet copies its agents and the LLDB hook into `~/Library/App
 
 ## One-time setup: the Xcode hook
 
-Add this block to `~/.lldbinit-Xcode` and `~/.lldbinit-lldb-rpc-server`, creating the files if needed. Xcode 27.1 reads the first; the second is for other Xcode versions.
+On launch, Desknet checks for the hook and offers to install it. Click **Install**, then restart Xcode. Later, use **Hook ▸ Xcode Hook…** to install or remove it.
+
+Install adds this block to `~/.lldbinit-Xcode` and `~/.lldbinit-lldb-rpc-server`, creating the files if needed. Xcode 27.1 reads the first; the second is for other Xcode versions. Each file is backed up to `<file>.desknet-backup` before it changes.
 
 ```
 # BEGIN Desknet Xcode Hook
 command script import "~/Library/Application Support/Desknet/desknet_hook.py"
 # END Desknet Xcode Hook
 ```
-
-Desknet doesn't add this for you yet. An Install/Remove button in Settings is planned.
 
 ## Use it
 
@@ -113,8 +113,8 @@ Mac apps with hardened runtime accept the agent because Xcode signs it with your
 
 ## Uninstall
 
-1. Quit Desknet.
-2. Remove the Desknet block from `~/.lldbinit-Xcode` and `~/.lldbinit-lldb-rpc-server`.
+1. Choose **Hook ▸ Xcode Hook…** and click **Remove**.
+2. Quit Desknet.
 3. Delete `~/Library/Application Support/Desknet/` and `~/Library/Caches/desknet.sock`.
 
 ## Project layout

@@ -47,6 +47,7 @@ final class DesknetAppDelegate: NSObject, NSApplicationDelegate {
 
         shortcutMonitor.start { controller.toggleDesknetWindow() }
         controller.showDesknetWindow()
+        if !DesknetHookInstaller.isInstalled { showHookAlert(nil) }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -66,6 +67,25 @@ final class DesknetAppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func showLogs(_ sender: Any?) {
         windowController?.showDesknetWindow()
+    }
+
+    /// Install when missing, Remove when present. Also offered on launch while missing.
+    @objc private func showHookAlert(_ sender: Any?) {
+        let installed = DesknetHookInstaller.isInstalled
+        let alert = NSAlert()
+        alert.messageText = installed ? "Xcode hook is installed" : "Install the Xcode hook?"
+        alert.informativeText = installed
+            ? "Remove it before you delete Desknet. Apps run from Xcode will no longer load the Desknet agent."
+            : "Desknet adds one import line to ~/.lldbinit-Xcode and ~/.lldbinit-lldb-rpc-server so apps you run from Xcode send their network logs here. Restart Xcode afterwards."
+        alert.addButton(withTitle: installed ? "Remove" : "Install")
+        alert.addButton(withTitle: installed ? "Cancel" : "Not Now")
+        if installed { alert.buttons[0].hasDestructiveAction = true }
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        do {
+            try installed ? DesknetHookInstaller.uninstall() : DesknetHookInstaller.install()
+        } catch {
+            NSAlert(error: error).runModal()
+        }
     }
 
     private func showListenerAlert() {
@@ -98,6 +118,10 @@ final class DesknetAppDelegate: NSObject, NSApplicationDelegate {
         let clear = logs.addItem(withTitle: "Clear Logs", action: #selector(clearLogs(_:)), keyEquivalent: "k")
         clear.target = self
         addSubmenu(logs, title: "Logs", to: main)
+
+        let hook = NSMenu(title: "Hook")
+        hook.addItem(withTitle: "Xcode Hook…", action: #selector(showHookAlert(_:)), keyEquivalent: "").target = self
+        addSubmenu(hook, title: "Hook", to: main)
 
         let window = NSMenu(title: "Window")
         window.addItem(withTitle: "Minimize", action: #selector(NSWindow.performMiniaturize(_:)), keyEquivalent: "m")
