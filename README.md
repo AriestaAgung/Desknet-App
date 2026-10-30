@@ -140,3 +140,11 @@ The wire format matches what the `Desknet-iOS` SDK sends today (`{"entry":{"_0":
 - "Launch with Desknet" for apps run without the debugger
 - An x86_64 Simulator agent for Intel Macs
 - Unnotarized release build (zip or DMG)
+
+## License
+
+Copyright (C) 2026 Ariesta Agung
+
+Desknet is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version. See [LICENSE](LICENSE).
+
+Using Desknet to debug your own apps puts no license terms on them. The agent is loaded into debug runs only and never ships inside your app.
