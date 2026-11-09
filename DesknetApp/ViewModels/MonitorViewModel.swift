@@ -44,19 +44,7 @@ final class DesknetMonitorViewModel: ObservableObject {
     private let store: DesknetStore
     private var storeChanges: AnyCancellable?
 
-    private let byteFormatter: ByteCountFormatter = {
-        let formatter = ByteCountFormatter()
-        formatter.countStyle = .binary
-        formatter.allowedUnits = [.useBytes, .useKB, .useMB]
-        formatter.includesUnit = true
-        return formatter
-    }()
-
-    private let timestampFormatter: DateFormatter = {
-        let formatter = DateFormatter()
-        formatter.dateFormat = "MM/dd/yyyy, hh:mm:ss.SSS a"
-        return formatter
-    }()
+    private let formatter = EntryFormatter()
 
     init(store: DesknetStore) {
         self.store = store
@@ -117,72 +105,22 @@ final class DesknetMonitorViewModel: ObservableObject {
         )
     }
 
-    func isError(_ entry: NetworkLogEntry) -> Bool {
-        entry.errorDescription != nil || (entry.statusCode ?? 0) >= 400
-    }
-
-    func statusText(for entry: NetworkLogEntry) -> String {
-        if let statusCode = entry.statusCode {
-            if isError(entry) {
-                return "\(statusCode) \(HTTPURLResponse.localizedString(forStatusCode: statusCode).capitalized)"
-            }
-            return "\(statusCode) OK"
-        }
-        // Entries only arrive once finished, so no status means the request failed (BACKLOG).
-        return entry.errorDescription != nil ? "Failed" : "Running"
-    }
-
-    func endpointTitle(for entry: NetworkLogEntry) -> String {
-        let path = entry.url.path
-        if path.isEmpty || path == "/" {
-            return entry.url.host ?? entry.url.absoluteString
-        }
-        return path
-    }
-
-    func baseURLText(for entry: NetworkLogEntry) -> String {
-        guard let scheme = entry.url.scheme,
-              let host = entry.url.host else {
-            return entry.url.absoluteString
-        }
-
-        if let port = entry.url.port {
-            return "\(scheme)://\(host):\(port)"
-        }
-        return "\(scheme)://\(host)"
-    }
-
-    func endpointDetailText(for entry: NetworkLogEntry) -> String {
-        var endpoint = entry.url.path.isEmpty ? "/" : entry.url.path
-
-        if let query = entry.url.query, !query.isEmpty {
-            endpoint += "?\(query)"
-        }
-        if let fragment = entry.url.fragment, !fragment.isEmpty {
-            endpoint += "#\(fragment)"
-        }
-        return endpoint
-    }
-
-    func durationText(for entry: NetworkLogEntry) -> String {
-        guard let duration = entry.duration else { return "-" }
-        return String(format: "%.3fms", duration * 1_000)
-    }
-
-    func sizeText(for entry: NetworkLogEntry) -> String {
-        byteFormatter.string(fromByteCount: Int64(entry.responseBody.count))
-    }
+    // Temporary forwards so views compile; removed in Task 5.
+    func isError(_ entry: NetworkLogEntry) -> Bool { formatter.isError(entry) }
+    func statusText(for entry: NetworkLogEntry) -> String { formatter.statusText(entry) }
+    func endpointTitle(for entry: NetworkLogEntry) -> String { formatter.endpointTitle(entry) }
+    func baseURLText(for entry: NetworkLogEntry) -> String { formatter.baseURLText(entry) }
+    func endpointDetailText(for entry: NetworkLogEntry) -> String { formatter.endpointDetailText(entry) }
+    func durationText(for entry: NetworkLogEntry) -> String { formatter.durationText(entry) }
+    func sizeText(for entry: NetworkLogEntry) -> String { formatter.sizeText(entry.responseBody.count) }
+    func timestampText(for entry: NetworkLogEntry) -> String { formatter.timestampText(entry) }
 
     func metricRows(for entry: NetworkLogEntry) -> [(String, String)] {
         [
-            ("Duration", durationText(for: entry)),
-            ("Request Size", byteFormatter.string(fromByteCount: Int64(entry.requestBody.count))),
-            ("Response Size", byteFormatter.string(fromByteCount: Int64(entry.responseBody.count))),
+            ("Duration", formatter.durationText(entry)),
+            ("Request Size", formatter.sizeText(entry.requestBody.count)),
+            ("Response Size", formatter.sizeText(entry.responseBody.count)),
         ]
-    }
-
-    func timestampText(for entry: NetworkLogEntry) -> String {
-        timestampFormatter.string(from: entry.startedAt)
     }
 
     func headers(for section: DetailSection, entry: NetworkLogEntry) -> [String: String] {
@@ -199,9 +137,9 @@ final class DesknetMonitorViewModel: ObservableObject {
     func bodyText(for section: DetailSection, entry: NetworkLogEntry) -> String {
         switch section {
         case .requestBody:
-            return bodyText(from: entry.requestBody, contentType: entry.requestHeaders["Content-Type"])
+            return formatter.bodyText(entry.requestBody, contentType: entry.requestHeaders["Content-Type"])
         case .responseBody:
-            return bodyText(from: entry.responseBody, contentType: entry.responseHeaders["Content-Type"])
+            return formatter.bodyText(entry.responseBody, contentType: entry.responseHeaders["Content-Type"])
         case .requestHeaders, .responseHeaders:
             return "{}"
         }
@@ -214,7 +152,7 @@ final class DesknetMonitorViewModel: ObservableObject {
 
     private func applyFilterAndSelection() {
         let previousSelection = selectedEntryID
-        entries = filteredEntries(from: allEntries, query: query)
+        entries = allEntries.filter { EntryFormatter.matches($0, query: query) }
 
         if let previousSelection,
            entries.contains(where: { $0.id == previousSelection }) {
@@ -223,46 +161,5 @@ final class DesknetMonitorViewModel: ObservableObject {
         }
 
         selectedEntryID = entries.first?.id
-    }
-
-    private func filteredEntries(from source: [NetworkLogEntry], query: String) -> [NetworkLogEntry] {
-        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
-        guard !trimmed.isEmpty else { return source }
-
-        return source.filter { entry in
-            let status = entry.statusCode.map(String.init) ?? ""
-            let haystack = [
-                entry.url.absoluteString,
-                entry.url.path,
-                entry.url.host ?? "",
-                entry.method,
-                status,
-                entry.errorDescription ?? "",
-            ].joined(separator: " ").lowercased()
-            return haystack.contains(trimmed)
-        }
-    }
-
-    private func bodyText(from data: Data, contentType: String?) -> String {
-        guard !data.isEmpty else { return "{}" }
-
-        if let object = try? JSONSerialization.jsonObject(with: data),
-           JSONSerialization.isValidJSONObject(object),
-           let pretty = try? JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys]),
-           let text = String(data: pretty, encoding: .utf8) {
-            return text
-        }
-
-        if let text = String(data: data, encoding: .utf8), !text.isEmpty {
-            return text
-        }
-
-        if (contentType ?? "").localizedCaseInsensitiveContains("json"),
-           let text = String(data: data, encoding: .ascii),
-           !text.isEmpty {
-            return text
-        }
-
-        return "Binary body (\(data.count) bytes)"
     }
 }
