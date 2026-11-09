@@ -94,9 +94,18 @@ struct EntryFormatter {
         return "Binary body (\(data.count) bytes)"
     }
 
+    /// Trimmed, lowercased search text. Compute once per filter pass, not per entry.
+    static func normalizedQuery(_ query: String) -> String {
+        query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+    }
+
     /// Case-insensitive search over URL, method, status and error. Blank query matches everything.
     static func matches(_ entry: NetworkLogEntry, query: String) -> Bool {
-        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        matches(entry, normalizedQuery: normalizedQuery(query))
+    }
+
+    /// `trimmed` must come from `normalizedQuery(_:)`.
+    static func matches(_ entry: NetworkLogEntry, normalizedQuery trimmed: String) -> Bool {
         guard !trimmed.isEmpty else { return true }
 
         let status = entry.statusCode.map(String.init) ?? ""

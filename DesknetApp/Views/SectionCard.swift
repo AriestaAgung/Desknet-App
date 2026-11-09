@@ -12,7 +12,8 @@ struct SectionCard: View {
             case let .headers(headers):
                 headerList(headers)
             case let .body(text):
-                bodyBlock(text)
+                // nil only while collapsed; the view model decodes it on expand.
+                bodyBlock(text ?? "")
             }
         }
     }

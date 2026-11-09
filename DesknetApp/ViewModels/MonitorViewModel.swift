@@ -100,6 +100,10 @@ final class MonitorViewModel {
     func setSection(_ section: DetailSection, expanded: Bool) {
         if expanded {
             collapsedSections.remove(section)
+            // A body skipped while collapsed is decoded now.
+            if detail?.sections.first(where: { $0.section == section })?.content == .body(nil) {
+                updateDetail(force: true)
+            }
         } else {
             collapsedSections.insert(section)
         }
@@ -131,7 +135,8 @@ final class MonitorViewModel {
 
     /// Keeps the current pick if it still matches the filter, else selects the newest entry.
     private func applyFilterAndSelection() {
-        entries = allEntries.filter { EntryFormatter.matches($0, query: query) }
+        let normalized = EntryFormatter.normalizedQuery(query)
+        entries = allEntries.filter { EntryFormatter.matches($0, normalizedQuery: normalized) }
         if rowCache.count > totalCount {
             rowCache = [:]
         }
@@ -148,11 +153,13 @@ final class MonitorViewModel {
         updateDetail()
     }
 
-    /// Entries never change once stored, so a detail for the same id is still current.
-    private func updateDetail() {
-        guard detail?.id != selectedEntryID else { return }
+    /// Entries never change once stored, so a detail for the same id is still current
+    /// unless `force` (a collapsed body was just expanded).
+    private func updateDetail(force: Bool = false) {
+        guard force || detail?.id != selectedEntryID else { return }
+        let collapsed = collapsedSections
         detail = selectedEntryID
             .flatMap { id in entries.first { $0.id == id } }
-            .map { RequestDetail(entry: $0, formatter: formatter) }
+            .map { RequestDetail(entry: $0, formatter: formatter, decodesBody: { !collapsed.contains($0) }) }
     }
 }

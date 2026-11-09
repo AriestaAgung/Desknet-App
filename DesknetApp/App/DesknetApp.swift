@@ -20,6 +20,12 @@ final class DesknetAppDelegate: NSObject, NSApplicationDelegate {
     private var listener: DesknetBridgeListener?
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        // Menu first, so the menu bar isn't empty while the agent files copy.
+        NSApp.mainMenu = MainMenu.make(
+            showLogs: { [weak self] in self?.windowController?.showDesknetWindow() },
+            clearLogs: { [store] in store.clear() },
+            showHook: { [weak self] in self?.showHookAlert() }
+        )
         DesknetAgentInstaller.install()
         runningApps.start()
 
@@ -29,12 +35,6 @@ final class DesknetAppDelegate: NSObject, NSApplicationDelegate {
         }
         let controller = DesknetWindowController(viewModel: viewModel)
         windowController = controller
-
-        NSApp.mainMenu = MainMenu.make(
-            showLogs: { controller.showDesknetWindow() },
-            clearLogs: { [store] in store.clear() },
-            showHook: { [weak self] in self?.showHookAlert() }
-        )
 
         startListener(controller: controller)
         shortcutMonitor.start { controller.toggleDesknetWindow() }

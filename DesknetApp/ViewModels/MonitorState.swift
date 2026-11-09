@@ -72,7 +72,8 @@ struct RequestDetail: Identifiable, Equatable {
     struct SectionContent: Equatable, Identifiable {
         enum Content: Equatable {
             case headers([Header])
-            case body(String)
+            /// nil: not decoded yet because the section was collapsed.
+            case body(String?)
         }
 
         let section: DetailSection
@@ -92,7 +93,8 @@ struct RequestDetail: Identifiable, Equatable {
     let error: String?
     let sections: [SectionContent]
 
-    init(entry: NetworkLogEntry, formatter: EntryFormatter) {
+    /// `decodesBody` says which body sections to pretty-print now; bodies can be 64 MB.
+    init(entry: NetworkLogEntry, formatter: EntryFormatter, decodesBody: (DetailSection) -> Bool = { _ in true }) {
         id = entry.id
         method = entry.method
         statusText = formatter.statusText(entry)
@@ -114,9 +116,11 @@ struct RequestDetail: Identifiable, Equatable {
             case .responseHeaders:
                 content = .headers(Self.sorted(entry.responseHeaders))
             case .requestBody:
-                content = .body(formatter.bodyText(entry.requestBody, contentType: entry.requestHeaders["Content-Type"]))
+                content = .body(decodesBody(section)
+                    ? formatter.bodyText(entry.requestBody, contentType: entry.requestHeaders["Content-Type"]) : nil)
             case .responseBody:
-                content = .body(formatter.bodyText(entry.responseBody, contentType: entry.responseHeaders["Content-Type"]))
+                content = .body(decodesBody(section)
+                    ? formatter.bodyText(entry.responseBody, contentType: entry.responseHeaders["Content-Type"]) : nil)
             }
             return SectionContent(section: section, content: content)
         }

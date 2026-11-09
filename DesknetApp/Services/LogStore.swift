@@ -85,9 +85,14 @@ final class DesknetStore: @unchecked Sendable {
     var changes: AnyPublisher<Void, Never> { subject.eraseToAnyPublisher() }
 
     private let subject = PassthroughSubject<Void, Never>()
+    /// Combine expects one `send` at a time; listener threads insert concurrently.
+    private let sendLock = NSLock()
 
     /// Called outside `lock`, so a subscriber can read the store without deadlocking.
+    /// A subscriber must not change the store synchronously from its sink (it would re-enter `sendLock`).
     private func notifyUpdated() {
+        sendLock.lock()
         subject.send()
+        sendLock.unlock()
     }
 }
