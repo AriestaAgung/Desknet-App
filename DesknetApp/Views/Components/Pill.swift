@@ -28,3 +28,14 @@ struct DesknetPill: View {
         return copy
     }
 }
+
+#Preview {
+    HStack(spacing: 8) {
+        DesknetPill(text: "GET", textColor: .green, fillColor: Color.green.opacity(0.15))
+        DesknetPill(text: "404 Not Found", textColor: .white, fillColor: Color.red.opacity(0.85))
+            .font(.system(size: 13, weight: .bold))
+    }
+    .padding()
+    .background(DesknetPalette.windowBackground)
+    .preferredColorScheme(.dark)
+}

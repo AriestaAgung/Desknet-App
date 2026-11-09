@@ -70,7 +70,7 @@ struct DesknetSectionCard: View {
                         }
                         .padding(10)
                         .frame(maxWidth: .infinity, alignment: .leading)
-                        .sectionBox(tint: tint)
+                        .tintedBox(tint)
                     }
                 }
             }
@@ -87,7 +87,7 @@ struct DesknetSectionCard: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
             }
             .padding(10)
-            .sectionBox(tint: tint)
+            .tintedBox(tint)
         }
     }
 
