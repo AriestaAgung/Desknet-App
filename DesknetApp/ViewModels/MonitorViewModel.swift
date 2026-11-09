@@ -30,6 +30,8 @@ final class MonitorViewModel {
     @ObservationIgnored private let runningApps: RunningAppsMonitor
     @ObservationIgnored private let copyText: (String) -> Void
     @ObservationIgnored private let formatter = EntryFormatter()
+    /// Stored entries never change, so each row is formatted once. Pruned when the store shrinks (Clear).
+    @ObservationIgnored private var rowCache: [UUID: RequestRow] = [:]
     @ObservationIgnored private var storeChanges: AnyCancellable?
 
     init(store: DesknetStore, runningApps: RunningAppsMonitor, copy: @escaping (String) -> Void) {
@@ -130,7 +132,15 @@ final class MonitorViewModel {
     /// Keeps the current pick if it still matches the filter, else selects the newest entry.
     private func applyFilterAndSelection() {
         entries = allEntries.filter { EntryFormatter.matches($0, query: query) }
-        requestRows = entries.map { RequestRow(entry: $0, formatter: formatter) }
+        if rowCache.count > totalCount {
+            rowCache = [:]
+        }
+        requestRows = entries.map { entry in
+            if let row = rowCache[entry.id] { return row }
+            let row = RequestRow(entry: entry, formatter: formatter)
+            rowCache[entry.id] = row
+            return row
+        }
 
         if selectedEntryID.map({ id in !entries.contains { $0.id == id } }) ?? true {
             selectedEntryID = entries.first?.id

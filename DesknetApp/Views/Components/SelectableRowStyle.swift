@@ -13,7 +13,6 @@ extension View {
                 RoundedRectangle(cornerRadius: 10)
                     .stroke(isSelected ? DesknetPalette.selectionBorder.opacity(0.55) : Color.clear, lineWidth: 1)
             )
-            .clipShape(RoundedRectangle(cornerRadius: 10))
             .contentShape(Rectangle())
     }
 }

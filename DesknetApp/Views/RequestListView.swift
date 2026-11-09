@@ -65,6 +65,8 @@ struct RequestRowView: View {
         .padding(.vertical, 10)
         .padding(.horizontal, 10)
         .selectableRowStyle(isSelected: isSelected, idleOpacity: 0.68)
+        // Request rows clip (app rows don't), matching the original styling.
+        .clipShape(RoundedRectangle(cornerRadius: 10))
         .accessibilityElement(children: .combine)
         .accessibilityLabel(row.accessibilityLabel)
     }
