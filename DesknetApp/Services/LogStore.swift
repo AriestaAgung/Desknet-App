@@ -1,30 +1,5 @@
+import Combine
 import Foundation
-
-extension Notification.Name {
-    static let desknetStoreDidUpdate = Notification.Name("desknet.store.did.update")
-}
-
-/// One captured request. This is also the wire format the Desknet SDKs send,
-/// so field names and types must stay as they are.
-struct NetworkLogEntry: Identifiable, Sendable, Codable {
-    let id: UUID
-    let startedAt: Date
-    let endedAt: Date?
-    let method: String
-    let url: URL
-    let requestHeaders: [String: String]
-    let requestBody: Data
-    let statusCode: Int?
-    let responseHeaders: [String: String]
-    let responseBody: Data
-    let mimeType: String?
-    let errorDescription: String?
-
-    var duration: TimeInterval? {
-        guard let endedAt else { return nil }
-        return endedAt.timeIntervalSince(startedAt)
-    }
-}
 
 /// Entries received from connected apps, tagged with the process that sent them.
 /// Viewer side only; capture lives in `DesknetAgent`.
@@ -105,9 +80,19 @@ final class DesknetStore: @unchecked Sendable {
         return selected.sorted { $0.startedAt > $1.startedAt }
     }
 
+    /// Fires after every change, on the thread that made it (listener threads for inserts).
+    /// Subscribers that touch UI state must hop to main themselves.
+    var changes: AnyPublisher<Void, Never> { subject.eraseToAnyPublisher() }
+
+    private let subject = PassthroughSubject<Void, Never>()
+    /// Combine expects one `send` at a time; listener threads insert concurrently.
+    private let sendLock = NSLock()
+
+    /// Called outside `lock`, so a subscriber can read the store without deadlocking.
+    /// A subscriber must not change the store synchronously from its sink (it would re-enter `sendLock`).
     private func notifyUpdated() {
-        OperationQueue.main.addOperation {
-            NotificationCenter.default.post(name: .desknetStoreDidUpdate, object: nil)
-        }
+        sendLock.lock()
+        subject.send()
+        sendLock.unlock()
     }
 }

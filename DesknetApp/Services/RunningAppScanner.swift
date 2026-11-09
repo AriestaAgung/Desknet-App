@@ -1,31 +1,5 @@
-import Combine
 import Darwin
 import Foundation
-
-/// An app Xcode is running: a Mac app from Xcode's build products, or a Mac or
-/// Simulator app under a debugger.
-/// ponytail: real iOS devices aren't listed; their processes aren't in this Mac's process table.
-struct RunningApp: Identifiable, Hashable, Sendable {
-    enum Platform: Hashable, Sendable {
-        case mac
-        case simulator(deviceName: String)
-    }
-
-    let pid: pid_t
-    let name: String
-    let bundleID: String?
-    let platform: Platform
-    let isDebugged: Bool
-
-    var id: pid_t { pid }
-
-    var platformText: String {
-        switch platform {
-        case .mac: return "My Mac"
-        case let .simulator(deviceName): return deviceName
-        }
-    }
-}
 
 enum RunningAppScanner {
     struct Match: Equatable {
@@ -92,40 +66,5 @@ enum RunningAppScanner {
         let plist = FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Developer/CoreSimulator/Devices/\(udid)/device.plist")
         return NSDictionary(contentsOf: plist)?["name"] as? String ?? "Simulator"
-    }
-}
-
-/// Keeps the list of Xcode-run apps current.
-/// ponytail: rescans every two seconds; switch to kqueue process events if the scan ever shows up in Instruments.
-@MainActor
-final class RunningAppsMonitor: ObservableObject {
-    @Published private(set) var apps: [RunningApp] = []
-    /// Polled with the apps, so installing or removing from the Hook menu shows within 2 seconds.
-    @Published private(set) var isHookInstalled = true
-    private var timer: Timer?
-
-    func start() {
-        guard timer == nil else { return }
-        refresh()
-        timer = Timer.scheduledTimer(withTimeInterval: 2, repeats: true) { [weak self] _ in
-            Task { @MainActor in self?.refresh() }
-        }
-    }
-
-    private func refresh() {
-        Task.detached(priority: .utility) { [weak self] in
-            let apps = RunningAppScanner.scan()
-            let isHookInstalled = DesknetHookInstaller.isInstalled
-            await self?.update(apps, isHookInstalled: isHookInstalled)
-        }
-    }
-
-    private func update(_ apps: [RunningApp], isHookInstalled: Bool) {
-        if self.apps != apps {
-            self.apps = apps
-        }
-        if self.isHookInstalled != isHookInstalled {
-            self.isHookInstalled = isHookInstalled
-        }
     }
 }

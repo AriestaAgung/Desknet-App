@@ -5,7 +5,7 @@ final class DesknetWindowController: NSWindowController {
     private let defaultFrame = NSRect(x: 140, y: 160, width: 1420, height: 780)
     private let minimumWindowSize = NSSize(width: 1100, height: 620)
 
-    init(viewModel: DesknetMonitorViewModel, runningApps: RunningAppsMonitor) {
+    init(viewModel: MonitorViewModel) {
         let window = NSWindow(
             contentRect: defaultFrame,
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
@@ -15,7 +15,7 @@ final class DesknetWindowController: NSWindowController {
         window.title = "Desknet Network Logs"
         window.minSize = minimumWindowSize
         window.contentViewController = NSHostingController(
-            rootView: DesknetMonitorRootView(viewModel: viewModel, runningApps: runningApps)
+            rootView: MonitorRootView(viewModel: viewModel)
         )
         window.isReleasedWhenClosed = false
         window.setFrameAutosaveName("Desknet.Window.v2")
@@ -56,29 +56,5 @@ final class DesknetWindowController: NSWindowController {
         } else {
             showDesknetWindow()
         }
-    }
-}
-
-/// Command-Control-Z while Desknet.app is focused toggles the window, matching the
-/// Simulator shortcut. Local only: a global hotkey would swallow the key before the Simulator gets it.
-final class DesknetShortcutMonitor {
-    private var localMonitor: Any?
-
-    func start(action: @escaping () -> Void) {
-        stop()
-        localMonitor = NSEvent.addLocalMonitorForEvents(matching: .keyDown) { event in
-            let modifiers = event.modifierFlags.intersection([.command, .control, .option, .shift])
-            guard modifiers == [.command, .control], event.charactersIgnoringModifiers?.lowercased() == "z" else {
-                return event
-            }
-            action()
-            return nil
-        }
-    }
-
-    func stop() {
-        guard let localMonitor else { return }
-        NSEvent.removeMonitor(localMonitor)
-        self.localMonitor = nil
     }
 }
