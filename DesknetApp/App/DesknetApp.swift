@@ -23,10 +23,11 @@ final class DesknetAppDelegate: NSObject, NSApplicationDelegate {
         DesknetAgentInstaller.install()
 
         runningApps.start()
-        let controller = DesknetWindowController(
-            viewModel: DesknetMonitorViewModel(store: store),
-            runningApps: runningApps
-        )
+        let viewModel = MonitorViewModel(store: store, runningApps: runningApps) { text in
+            NSPasteboard.general.clearContents()
+            NSPasteboard.general.setString(text, forType: .string)
+        }
+        let controller = DesknetWindowController(viewModel: viewModel)
         windowController = controller
 
         let listener = DesknetBridgeListener(store: store) { message in

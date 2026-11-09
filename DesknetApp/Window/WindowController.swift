@@ -5,7 +5,7 @@ final class DesknetWindowController: NSWindowController {
     private let defaultFrame = NSRect(x: 140, y: 160, width: 1420, height: 780)
     private let minimumWindowSize = NSSize(width: 1100, height: 620)
 
-    init(viewModel: DesknetMonitorViewModel, runningApps: RunningAppsMonitor) {
+    init(viewModel: MonitorViewModel) {
         let window = NSWindow(
             contentRect: defaultFrame,
             styleMask: [.titled, .closable, .miniaturizable, .resizable],
@@ -15,7 +15,7 @@ final class DesknetWindowController: NSWindowController {
         window.title = "Desknet Network Logs"
         window.minSize = minimumWindowSize
         window.contentViewController = NSHostingController(
-            rootView: DesknetMonitorRootView(viewModel: viewModel, runningApps: runningApps)
+            rootView: MonitorRootView(viewModel: viewModel)
         )
         window.isReleasedWhenClosed = false
         window.setFrameAutosaveName("Desknet.Window.v2")

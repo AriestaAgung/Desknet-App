@@ -1,53 +1,41 @@
-import AppKit
 import Combine
 import Foundation
-import SwiftUI
+import Observation
 
+/// State and intents for the monitor window. Views render `appRows`, `requestRows` and `detail`
+/// and call the intents; they never read the store or format entries themselves.
 @MainActor
-final class DesknetMonitorViewModel: ObservableObject {
-    enum DetailSection: Int, CaseIterable, Hashable {
-        case requestHeaders
-        case requestBody
-        case responseHeaders
-        case responseBody
-
-        var title: String {
-            switch self {
-            case .requestHeaders: return "Request Headers"
-            case .requestBody: return "Request Body"
-            case .responseHeaders: return "Response Headers"
-            case .responseBody: return "Response Body"
-            }
-        }
-    }
-
-    @Published var query = "" {
+@Observable
+final class MonitorViewModel {
+    var query = "" {
         didSet { applyFilterAndSelection() }
     }
-    @Published private(set) var allEntries: [NetworkLogEntry] = []
-    @Published private(set) var entries: [NetworkLogEntry] = []
-    @Published var selectedEntryID: UUID?
-    @Published var collapsedSections: Set<DetailSection> = [.requestHeaders, .responseHeaders]
     /// App picked in the apps column; nil shows every app's requests.
     /// ponytail: keyed by PID, so a relaunch from Xcode is a new row to pick.
-    @Published var selectedPID: pid_t? {
-        didSet {
-            guard oldValue != selectedPID else { return }
-            selectedEntryID = nil
-            reload()
-        }
-    }
-    @Published private(set) var connectedPIDs: Set<pid_t> = []
-    @Published private(set) var countsByPID: [pid_t: Int] = [:]
-    @Published private(set) var totalCount = 0
+    private(set) var selectedPID: pid_t?
+    private(set) var selectedEntryID: UUID?
+    private(set) var collapsedSections: Set<DetailSection> = [.requestHeaders, .responseHeaders]
 
-    private let store: DesknetStore
-    private var storeChanges: AnyCancellable?
+    private(set) var requestRows: [RequestRow] = []
+    /// Built only for the selected entry, and only when the selection changes: bodies can be 64 MB.
+    private(set) var detail: RequestDetail?
 
-    private let formatter = EntryFormatter()
+    private var allEntries: [NetworkLogEntry] = []
+    private var entries: [NetworkLogEntry] = []
+    private var connectedPIDs: Set<pid_t> = []
+    private var countsByPID: [pid_t: Int] = [:]
+    private var totalCount = 0
 
-    init(store: DesknetStore) {
+    @ObservationIgnored private let store: DesknetStore
+    @ObservationIgnored private let runningApps: RunningAppsMonitor
+    @ObservationIgnored private let copyText: (String) -> Void
+    @ObservationIgnored private let formatter = EntryFormatter()
+    @ObservationIgnored private var storeChanges: AnyCancellable?
+
+    init(store: DesknetStore, runningApps: RunningAppsMonitor, copy: @escaping (String) -> Void) {
         self.store = store
+        self.runningApps = runningApps
+        self.copyText = copy
         storeChanges = store.changes
             .receive(on: DispatchQueue.main)
             .sink { [weak self] in
@@ -56,14 +44,11 @@ final class DesknetMonitorViewModel: ObservableObject {
         reload()
     }
 
-    var selectedEntry: NetworkLogEntry? {
-        guard let selectedEntryID else { return nil }
-        return entries.first { $0.id == selectedEntryID }
-    }
+    // MARK: Derived state
 
-    var requestCountText: String {
-        "\(entries.count) requests"
-    }
+    var isHookInstalled: Bool { runningApps.isHookInstalled }
+
+    var requestCountText: String { "\(entries.count) requests" }
 
     var emptyStateText: String {
         guard entries.isEmpty else { return "Select an API call from the list to view request/response details." }
@@ -74,8 +59,56 @@ final class DesknetMonitorViewModel: ObservableObject {
         return "No requests found."
     }
 
+    /// "All apps", then each running app, then the selected app if it has quit, so its logs stay reachable.
+    var appRows: [AppRow] {
+        let apps = runningApps.apps
+        var rows = [AppRow(pid: nil, title: "All apps", subtitle: "\(totalCount) requests", isLive: !connectedPIDs.isEmpty)]
+        rows += apps.map { app in
+            AppRow(pid: app.pid, title: app.name, subtitle: subtitle(for: app), isLive: connectedPIDs.contains(app.pid))
+        }
+        if let pid = selectedPID, !apps.contains(where: { $0.pid == pid }) {
+            rows.append(AppRow(pid: pid, title: "Ended app",
+                               subtitle: "PID \(pid) · \(countsByPID[pid, default: 0]) requests", isLive: false))
+        }
+        return rows
+    }
+
+    var hasRunningApps: Bool { !runningApps.apps.isEmpty }
+
+    var selectedAppRowID: String { AppRow.id(for: selectedPID) }
+
+    func isSectionExpanded(_ section: DetailSection) -> Bool {
+        !collapsedSections.contains(section)
+    }
+
+    // MARK: Intents
+
+    func select(pid: pid_t?) {
+        guard pid != selectedPID else { return }
+        selectedPID = pid
+        selectedEntryID = nil
+        reload()
+    }
+
+    func select(entry id: UUID) {
+        selectedEntryID = id
+        updateDetail()
+    }
+
+    func setSection(_ section: DetailSection, expanded: Bool) {
+        if expanded {
+            collapsedSections.remove(section)
+        } else {
+            collapsedSections.insert(section)
+        }
+    }
+
     func clear() {
         store.clear()
+    }
+
+    func copy(_ text: String) {
+        copyText(text)
     }
 
     func reload() {
@@ -86,80 +119,30 @@ final class DesknetMonitorViewModel: ObservableObject {
         applyFilterAndSelection()
     }
 
-    func setSectionExpanded(_ section: DetailSection, isExpanded: Bool) {
-        if isExpanded {
-            collapsedSections.remove(section)
-        } else {
-            collapsedSections.insert(section)
-        }
+    // MARK: Private
+
+    private func subtitle(for app: RunningApp) -> String {
+        let count = countsByPID[app.pid, default: 0]
+        let logs = count > 0 || connectedPIDs.contains(app.pid) ? "\(count) requests" : "no logs yet"
+        return "\(app.platformText) · \(logs)"
     }
 
-    func isSectionExpanded(_ section: DetailSection) -> Bool {
-        !collapsedSections.contains(section)
-    }
-
-    func sectionBinding(_ section: DetailSection) -> Binding<Bool> {
-        Binding(
-            get: { [weak self] in self?.isSectionExpanded(section) ?? false },
-            set: { [weak self] in self?.setSectionExpanded(section, isExpanded: $0) }
-        )
-    }
-
-    // Temporary forwards so views compile; removed in Task 5.
-    func isError(_ entry: NetworkLogEntry) -> Bool { formatter.isError(entry) }
-    func statusText(for entry: NetworkLogEntry) -> String { formatter.statusText(entry) }
-    func endpointTitle(for entry: NetworkLogEntry) -> String { formatter.endpointTitle(entry) }
-    func baseURLText(for entry: NetworkLogEntry) -> String { formatter.baseURLText(entry) }
-    func endpointDetailText(for entry: NetworkLogEntry) -> String { formatter.endpointDetailText(entry) }
-    func durationText(for entry: NetworkLogEntry) -> String { formatter.durationText(entry) }
-    func sizeText(for entry: NetworkLogEntry) -> String { formatter.sizeText(entry.responseBody.count) }
-    func timestampText(for entry: NetworkLogEntry) -> String { formatter.timestampText(entry) }
-
-    func metricRows(for entry: NetworkLogEntry) -> [(String, String)] {
-        [
-            ("Duration", formatter.durationText(entry)),
-            ("Request Size", formatter.sizeText(entry.requestBody.count)),
-            ("Response Size", formatter.sizeText(entry.responseBody.count)),
-        ]
-    }
-
-    func headers(for section: DetailSection, entry: NetworkLogEntry) -> [String: String] {
-        switch section {
-        case .requestHeaders:
-            return entry.requestHeaders
-        case .responseHeaders:
-            return entry.responseHeaders
-        case .requestBody, .responseBody:
-            return [:]
-        }
-    }
-
-    func bodyText(for section: DetailSection, entry: NetworkLogEntry) -> String {
-        switch section {
-        case .requestBody:
-            return formatter.bodyText(entry.requestBody, contentType: entry.requestHeaders["Content-Type"])
-        case .responseBody:
-            return formatter.bodyText(entry.responseBody, contentType: entry.responseHeaders["Content-Type"])
-        case .requestHeaders, .responseHeaders:
-            return "{}"
-        }
-    }
-
-    func copyToPasteboard(_ text: String) {
-        NSPasteboard.general.clearContents()
-        NSPasteboard.general.setString(text, forType: .string)
-    }
-
+    /// Keeps the current pick if it still matches the filter, else selects the newest entry.
     private func applyFilterAndSelection() {
-        let previousSelection = selectedEntryID
         entries = allEntries.filter { EntryFormatter.matches($0, query: query) }
+        requestRows = entries.map { RequestRow(entry: $0, formatter: formatter) }
 
-        if let previousSelection,
-           entries.contains(where: { $0.id == previousSelection }) {
-            selectedEntryID = previousSelection
-            return
+        if selectedEntryID.map({ id in !entries.contains { $0.id == id } }) ?? true {
+            selectedEntryID = entries.first?.id
         }
+        updateDetail()
+    }
 
-        selectedEntryID = entries.first?.id
+    /// Entries never change once stored, so a detail for the same id is still current.
+    private func updateDetail() {
+        guard detail?.id != selectedEntryID else { return }
+        detail = selectedEntryID
+            .flatMap { id in entries.first { $0.id == id } }
+            .map { RequestDetail(entry: $0, formatter: formatter) }
     }
 }

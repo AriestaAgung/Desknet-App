@@ -1,53 +1,71 @@
 import SwiftUI
 
-struct DesknetRequestRowView: View {
-    let entry: NetworkLogEntry
-    let isSelected: Bool
-    @ObservedObject var viewModel: DesknetMonitorViewModel
+/// Middle column: search plus the request list, newest first.
+struct RequestListView: View {
+    @Binding var query: String
+    let rows: [RequestRow]
+    let selectedID: UUID?
+    let onSelect: (UUID) -> Void
 
     var body: some View {
-        let accent = viewModel.isError(entry) ? Color.red : Color.green
+        VStack(spacing: 0) {
+            SearchField(placeholder: "Search requests...", text: $query, accessibilityLabel: "Search requests")
+                .padding(.horizontal, 14)
+                .padding(.top, 14)
+                .padding(.bottom, 12)
+
+            ScrollView {
+                LazyVStack(spacing: 8) {
+                    ForEach(rows) { row in
+                        Button {
+                            onSelect(row.id)
+                        } label: {
+                            RequestRowView(row: row, isSelected: selectedID == row.id)
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityAddTraits(selectedID == row.id ? .isSelected : [])
+                    }
+                }
+                .padding(.horizontal, 8)
+                .padding(.bottom, 8)
+            }
+        }
+        .background(DesknetPalette.windowBackground)
+    }
+}
+
+struct RequestRowView: View {
+    let row: RequestRow
+    let isSelected: Bool
+
+    var body: some View {
+        let accent = row.isError ? Color.red : Color.green
 
         VStack(alignment: .leading, spacing: 6) {
             HStack(spacing: 10) {
-                Circle()
-                    .fill(accent)
-                    .frame(width: 8, height: 8)
-                    .accessibilityHidden(true)
+                StatusDot(color: accent)
 
-                DesknetPill(text: entry.method, textColor: accent, fillColor: accent.opacity(0.15))
+                DesknetPill(text: row.method, textColor: accent, fillColor: accent.opacity(0.15))
                     .font(.system(size: 12, weight: .bold))
 
-                Text(entry.statusCode.map(String.init) ?? "-")
+                Text(row.statusCodeText)
                     .font(.system(size: 13, weight: .bold))
                     .foregroundColor(accent)
             }
 
-            Text(viewModel.endpointTitle(for: entry))
+            Text(row.title)
                 .font(.system(size: 16, weight: .semibold))
                 .lineLimit(1)
 
-            Text("◷ \(viewModel.durationText(for: entry))   \(viewModel.sizeText(for: entry))")
+            Text(row.metricsText)
                 .font(.system(size: 13, weight: .semibold))
                 .foregroundColor(.secondary)
                 .lineLimit(1)
         }
         .padding(.vertical, 10)
         .padding(.horizontal, 10)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(DesknetPalette.controlBackground.opacity(isSelected ? 0.96 : 0.68))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 10)
-                .stroke(isSelected ? DesknetPalette.selectionBorder.opacity(0.55) : Color.clear, lineWidth: 1)
-        )
-        .clipShape(RoundedRectangle(cornerRadius: 10))
-        .contentShape(Rectangle())
+        .selectableRowStyle(isSelected: isSelected, idleOpacity: 0.68)
         .accessibilityElement(children: .combine)
-        .accessibilityLabel(
-            "\(entry.method) \(viewModel.endpointTitle(for: entry)), \(viewModel.statusText(for: entry)), \(viewModel.durationText(for: entry))"
-        )
+        .accessibilityLabel(row.accessibilityLabel)
     }
 }
