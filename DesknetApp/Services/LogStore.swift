@@ -1,8 +1,5 @@
+import Combine
 import Foundation
-
-extension Notification.Name {
-    static let desknetStoreDidUpdate = Notification.Name("desknet.store.did.update")
-}
 
 /// Entries received from connected apps, tagged with the process that sent them.
 /// Viewer side only; capture lives in `DesknetAgent`.
@@ -83,9 +80,14 @@ final class DesknetStore: @unchecked Sendable {
         return selected.sorted { $0.startedAt > $1.startedAt }
     }
 
+    /// Fires after every change, on the thread that made it (listener threads for inserts).
+    /// Subscribers that touch UI state must hop to main themselves.
+    var changes: AnyPublisher<Void, Never> { subject.eraseToAnyPublisher() }
+
+    private let subject = PassthroughSubject<Void, Never>()
+
+    /// Called outside `lock`, so a subscriber can read the store without deadlocking.
     private func notifyUpdated() {
-        OperationQueue.main.addOperation {
-            NotificationCenter.default.post(name: .desknetStoreDidUpdate, object: nil)
-        }
+        subject.send()
     }
 }

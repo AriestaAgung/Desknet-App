@@ -42,7 +42,7 @@ final class DesknetMonitorViewModel: ObservableObject {
     @Published private(set) var totalCount = 0
 
     private let store: DesknetStore
-    private var observer: NSObjectProtocol?
+    private var storeChanges: AnyCancellable?
 
     private let byteFormatter: ByteCountFormatter = {
         let formatter = ByteCountFormatter()
@@ -60,22 +60,12 @@ final class DesknetMonitorViewModel: ObservableObject {
 
     init(store: DesknetStore) {
         self.store = store
-        observer = NotificationCenter.default.addObserver(
-            forName: .desknetStoreDidUpdate,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                self?.reload()
+        storeChanges = store.changes
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] in
+                MainActor.assumeIsolated { self?.reload() }
             }
-        }
         reload()
-    }
-
-    deinit {
-        if let observer {
-            NotificationCenter.default.removeObserver(observer)
-        }
     }
 
     var selectedEntry: NetworkLogEntry? {
