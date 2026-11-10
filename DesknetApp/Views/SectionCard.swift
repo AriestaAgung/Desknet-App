@@ -14,6 +14,9 @@ struct SectionCard: View {
             case let .body(text):
                 // nil only while collapsed; the view model decodes it on expand.
                 bodyBlock(text ?? "")
+            case let .image(data):
+                // nil only while collapsed, same as .body.
+                imageBlock(data)
             }
         }
     }
@@ -60,6 +63,29 @@ struct SectionCard: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
         .padding(10)
+        .tintedBox(tint)
+    }
+
+    private func imageBlock(_ data: Data?) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            if let data, let image = NSImage(data: data) {
+                Image(nsImage: image)
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFit()
+                    .frame(maxWidth: min(image.size.width, 400), maxHeight: min(image.size.height, 400))
+                    .accessibilityLabel("\(content.section.title) image")
+                Text("\(Int(image.size.width)) × \(Int(image.size.height)) px")
+                    .font(.system(size: 11))
+                    .foregroundColor(.secondary)
+            } else if let data {
+                Text("Image data could not be decoded (\(data.count) bytes)")
+                    .font(.system(size: 12))
+                    .foregroundColor(.secondary)
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
         .tintedBox(tint)
     }
 

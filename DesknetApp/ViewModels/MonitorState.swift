@@ -1,5 +1,6 @@
 import Foundation
 
+
 /// The four collapsible cards under a request's summary, in display order.
 enum DetailSection: Int, CaseIterable, Hashable {
     case requestHeaders
@@ -74,6 +75,7 @@ struct RequestDetail: Identifiable, Equatable {
             case headers([Header])
             /// nil: not decoded yet because the section was collapsed.
             case body(String?)
+            case image(Data?)
         }
 
         let section: DetailSection
@@ -116,14 +118,50 @@ struct RequestDetail: Identifiable, Equatable {
             case .responseHeaders:
                 content = .headers(Self.sorted(entry.responseHeaders))
             case .requestBody:
-                content = .body(decodesBody(section)
-                    ? formatter.bodyText(entry.requestBody, contentType: entry.requestHeaders["Content-Type"]) : nil)
+                let type = Self.header("Content-Type", in: entry.requestHeaders)
+                content = Self.bodyContent(entry.requestBody, contentType: type,
+                                           decode: decodesBody(section), formatter: formatter)
             case .responseBody:
-                content = .body(decodesBody(section)
-                    ? formatter.bodyText(entry.responseBody, contentType: entry.responseHeaders["Content-Type"]) : nil)
+                let type = entry.mimeType ?? Self.header("Content-Type", in: entry.responseHeaders)
+                content = Self.bodyContent(entry.responseBody, contentType: type,
+                                           decode: decodesBody(section), formatter: formatter)
             }
             return SectionContent(section: section, content: content)
         }
+    }
+
+    private static func bodyContent(_ data: Data, contentType: String?, decode: Bool,
+                                     formatter: EntryFormatter) -> SectionContent.Content {
+        if isImage(data, contentType: contentType) {
+            return .image(decode ? data : nil)
+        }
+        return .body(decode ? formatter.bodyText(data, contentType: contentType) : nil)
+    }
+
+    /// Image if the MIME type says so, else sniff magic bytes (servers often send octet-stream or nothing).
+    /// SVG is excluded: it is XML text and NSImage can't reliably decode it.
+    static func isImage(_ data: Data, contentType: String?) -> Bool {
+        let type = (contentType ?? "").lowercased()
+        if type.hasPrefix("image/svg") { return false }
+        if type.hasPrefix("image/") { return true }
+        if !type.isEmpty, !type.hasPrefix("application/octet-stream") { return false }
+        return sniffImage(data)
+    }
+
+    /// HTTP header names are case-insensitive; HTTP/2 sends them lowercase.
+    static func header(_ name: String, in headers: [String: String]) -> String? {
+        headers.first { $0.key.caseInsensitiveCompare(name) == .orderedSame }?.value
+    }
+
+    private static func sniffImage(_ data: Data) -> Bool {
+        let b = [UInt8](data.prefix(12))
+        guard b.count >= 4 else { return false }
+        if b.starts(with: [0x89, 0x50, 0x4E, 0x47]) { return true } // PNG
+        if b.starts(with: [0xFF, 0xD8, 0xFF]) { return true } // JPEG
+        if b.starts(with: [0x47, 0x49, 0x46, 0x38]) { return true } // GIF
+        if b.count >= 12, b.starts(with: [0x52, 0x49, 0x46, 0x46]),
+           b[8...11].elementsEqual([0x57, 0x45, 0x42, 0x50]) { return true } // WEBP
+        return false
     }
 
     private static func sorted(_ headers: [String: String]) -> [Header] {
