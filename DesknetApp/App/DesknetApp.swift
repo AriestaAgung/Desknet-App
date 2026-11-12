@@ -40,6 +40,16 @@ final class DesknetAppDelegate: NSObject, NSApplicationDelegate {
                 guard let image = NSImage(data: data) else { return }
                 pasteboard.clearContents()
                 pasteboard.writeObjects([image])
+            case let .svg(data):
+                // One item, three flavours: design tools take SVG, editors take text, others take the bitmap.
+                let item = NSPasteboardItem()
+                item.setData(data, forType: NSPasteboard.PasteboardType("public.svg-image"))
+                item.setString(String(decoding: data, as: UTF8.self), forType: .string)
+                if let tiff = NSImage(data: data)?.tiffRepresentation {
+                    item.setData(tiff, forType: .tiff)
+                }
+                pasteboard.clearContents()
+                pasteboard.writeObjects([item])
             }
         }
         let controller = DesknetWindowController(viewModel: viewModel)

@@ -149,13 +149,19 @@ struct RequestDetail: Identifiable, Equatable {
     }
 
     /// Image if the MIME type says so, else sniff magic bytes (servers often send octet-stream or nothing).
-    /// SVG is excluded: it is XML text and NSImage can't reliably decode it.
+    /// SVG counts as an image; the view renders it with WebKit instead of NSImage.
     static func isImage(_ data: Data, contentType: String?) -> Bool {
         let type = (contentType ?? "").lowercased()
-        if type.hasPrefix("image/svg") { return false }
         if type.hasPrefix("image/") { return true }
         if !type.isEmpty, !type.hasPrefix("application/octet-stream") { return false }
-        return sniffImage(data)
+        return sniffImage(data) || isSVG(data)
+    }
+
+    /// SVG markup: starts with a tag and has `<svg` near the top (after any XML declaration, comments or doctype).
+    static func isSVG(_ data: Data) -> Bool {
+        let head = String(decoding: data.prefix(1024), as: UTF8.self).lowercased()
+        let trimmed = head.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: "\u{FEFF}")))
+        return trimmed.hasPrefix("<") && head.contains("<svg")
     }
 
     /// HTTP header names are case-insensitive; HTTP/2 sends them lowercase.
