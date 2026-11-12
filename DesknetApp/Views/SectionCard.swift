@@ -17,6 +17,9 @@ struct SectionCard: View {
             case let .image(data):
                 // nil only while collapsed, same as .body.
                 imageBlock(data)
+            case let .multipart(parts):
+                // nil only while collapsed, same as .body.
+                multipartBlock(parts ?? [])
             }
         }
     }
@@ -68,18 +71,79 @@ struct SectionCard: View {
 
     private func imageBlock(_ data: Data?) -> some View {
         VStack(alignment: .leading, spacing: 8) {
-            if let data, let image = NSImage(data: data) {
-                Image(nsImage: image)
-                    .resizable()
-                    .interpolation(.high)
-                    .scaledToFit()
-                    .frame(maxWidth: min(image.size.width, 400), maxHeight: min(image.size.height, 400))
-                    .accessibilityLabel("\(content.section.title) image")
-                Text("\(Int(image.size.width)) × \(Int(image.size.height)) px")
-                    .font(.system(size: 11))
-                    .foregroundColor(.secondary)
-            } else if let data {
-                Text("Image data could not be decoded (\(data.count) bytes)")
+            if let data {
+                imagePreview(data, label: "\(content.section.title) image")
+            }
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .tintedBox(tint)
+    }
+
+    @ViewBuilder
+    private func imagePreview(_ data: Data, label: String) -> some View {
+        if let image = NSImage(data: data) {
+            Image(nsImage: image)
+                .resizable()
+                .interpolation(.high)
+                .scaledToFit()
+                .frame(maxWidth: min(image.size.width, 400), maxHeight: min(image.size.height, 400))
+                .accessibilityLabel(label)
+            Text("\(Int(image.size.width)) × \(Int(image.size.height)) px")
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+        } else {
+            Text("Image data could not be decoded (\(data.count) bytes)")
+                .font(.system(size: 12))
+                .foregroundColor(.secondary)
+        }
+    }
+
+    /// One box per form field: name and filename on top, then its text or image.
+    @ViewBuilder
+    private func multipartBlock(_ parts: [MultipartPart]) -> some View {
+        if parts.isEmpty {
+            Text("Empty multipart body")
+                .font(.system(size: 13))
+                .foregroundColor(.secondary)
+        } else {
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(Array(parts.enumerated()), id: \.offset) { _, part in
+                    multipartPart(part)
+                }
+            }
+        }
+    }
+
+    private func multipartPart(_ part: MultipartPart) -> some View {
+        let name = part.name ?? "Unnamed part"
+        let detail = [part.filename, part.contentType].compactMap { $0 }.joined(separator: " · ")
+        return VStack(alignment: .leading, spacing: 6) {
+            HStack(alignment: .top) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(name)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(.secondary)
+                    if !detail.isEmpty {
+                        Text(detail)
+                            .font(.system(size: 11))
+                            .foregroundColor(.secondary)
+                    }
+                }
+                Spacer()
+                if case let .text(text) = part.value {
+                    CopyButton(text: text, label: "Copy \(name)", onCopy: onCopy)
+                }
+            }
+            switch part.value {
+            case let .text(text):
+                Text(text)
+                    .font(.system(size: 12, weight: .regular, design: .monospaced))
+                    .textSelection(.enabled)
+            case let .image(data):
+                imagePreview(data, label: "\(name) image")
+            case let .binary(count):
+                Text("Binary data (\(count) bytes)")
                     .font(.system(size: 12))
                     .foregroundColor(.secondary)
             }

@@ -101,8 +101,7 @@ final class MonitorViewModel {
         if expanded {
             collapsedSections.remove(section)
             // A body skipped while collapsed is decoded now.
-            let current = detail?.sections.first(where: { $0.section == section })?.content
-            if current == .body(nil) || current == .image(nil) {
+            if detail?.sections.first(where: { $0.section == section })?.content.isUndecoded == true {
                 updateDetail(force: true)
             }
         } else {

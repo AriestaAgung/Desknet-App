@@ -76,6 +76,12 @@ struct RequestDetail: Identifiable, Equatable {
             /// nil: not decoded yet because the section was collapsed.
             case body(String?)
             case image(Data?)
+            case multipart([MultipartPart]?)
+
+            /// Body skipped while its section was collapsed; decode it on expand.
+            var isUndecoded: Bool {
+                self == .body(nil) || self == .image(nil) || self == .multipart(nil)
+            }
         }
 
         let section: DetailSection
@@ -134,6 +140,11 @@ struct RequestDetail: Identifiable, Equatable {
                                      formatter: EntryFormatter) -> SectionContent.Content {
         if isImage(data, contentType: contentType) {
             return .image(decode ? data : nil)
+        }
+        if let boundary = MultipartParser.boundary(from: contentType) {
+            guard decode else { return .multipart(nil) }
+            // Malformed multipart falls through to plain text.
+            if let parts = MultipartParser.parse(data, boundary: boundary) { return .multipart(parts) }
         }
         return .body(decode ? formatter.bodyText(data, contentType: contentType) : nil)
     }
