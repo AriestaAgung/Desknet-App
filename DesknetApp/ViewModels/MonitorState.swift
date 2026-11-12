@@ -1,6 +1,5 @@
 import Foundation
 
-
 /// The four collapsible cards under a request's summary, in display order.
 enum DetailSection: Int, CaseIterable, Hashable {
     case requestHeaders
