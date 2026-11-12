@@ -6,26 +6,40 @@ import SwiftUI
 struct ImagePreviewItem: Identifiable {
     let id = UUID()
     let title: String
-    let image: NSImage
     let data: Data
+    /// nil for SVG, which is drawn by WebKit.
+    let image: NSImage?
 }
 
 /// Large image view: trackpad pinch to zoom, two-finger drag to pan, double-tap to smart zoom.
 /// Toolbar buttons and Preview.app shortcuts (⌘+, ⌘-, ⌘0 actual size, ⌘9 fit) cover mouse users.
+/// Bitmaps use an NSScrollView; SVG uses a sandboxed WKWebView (see `SVGWebView`).
 struct ImagePreviewSheet: View {
     let item: ImagePreviewItem
     let onCopy: (CopyPayload) -> Void
     @Environment(\.dismiss) private var dismiss
     @StateObject private var zoom = ImageZoomController()
+    @State private var svgZoom = SVGZoomController()
 
     var body: some View {
         VStack(spacing: 0) {
             toolbar
             Divider()
-            ZoomableImageView(image: item.image, controller: zoom)
+            if let image = item.image {
+                ZoomableImageView(image: image, controller: zoom)
+            } else {
+                SVGWebView(data: item.data, interactive: true, controller: svgZoom)
+            }
         }
         .frame(minWidth: 480, idealWidth: 820, minHeight: 360, idealHeight: 620)
         .background(DesknetPalette.windowBackground)
+    }
+
+    private var subtitle: String {
+        if let image = item.image {
+            return "\(Int(image.size.width)) × \(Int(image.size.height)) px"
+        }
+        return "SVG · \(ByteCountFormatter.string(fromByteCount: Int64(item.data.count), countStyle: .file))"
     }
 
     private var toolbar: some View {
@@ -33,33 +47,57 @@ struct ImagePreviewSheet: View {
             VStack(alignment: .leading, spacing: 2) {
                 Text(item.title)
                     .font(.system(size: 13, weight: .semibold))
-                Text("\(Int(item.image.size.width)) × \(Int(item.image.size.height)) px")
+                Text(subtitle)
                     .font(.system(size: 11))
                     .foregroundColor(.secondary)
             }
             Spacer()
-            Button(action: zoom.zoomOut) { Image(systemName: "minus.magnifyingglass") }
-                .keyboardShortcut("-", modifiers: .command)
-                .help("Zoom Out (⌘-)")
-            Text("\(Int((zoom.magnification * 100).rounded()))%")
-                .font(.system(size: 12).monospacedDigit())
-                .frame(minWidth: 44)
-                .accessibilityLabel("Zoom \(Int((zoom.magnification * 100).rounded())) percent")
-            Button(action: zoom.zoomIn) { Image(systemName: "plus.magnifyingglass") }
-                .keyboardShortcut("=", modifiers: .command)
-                .help("Zoom In (⌘+)")
-            Button("Fit", action: zoom.fit)
-                .keyboardShortcut("9", modifiers: .command)
-                .help("Zoom to Fit (⌘9)")
-            Button("100%", action: zoom.actualSize)
-                .keyboardShortcut("0", modifiers: .command)
-                .help("Actual Size (⌘0)")
-            CopyButton(payload: .image(item.data), label: "Copy Image", onCopy: onCopy)
+            if item.image != nil {
+                bitmapZoomControls
+                CopyButton(payload: .image(item.data), label: "Copy Image", onCopy: onCopy)
+            } else {
+                svgZoomControls
+                CopyButton(payload: .svg(item.data), label: "Copy SVG", onCopy: onCopy)
+            }
             Button("Done") { dismiss() }
                 .keyboardShortcut(.cancelAction)
         }
         .buttonStyle(.borderless)
         .padding(12)
+    }
+
+    @ViewBuilder
+    private var bitmapZoomControls: some View {
+        Button(action: zoom.zoomOut) { Image(systemName: "minus.magnifyingglass") }
+            .keyboardShortcut("-", modifiers: .command)
+            .help("Zoom Out (⌘-)")
+        Text("\(Int((zoom.magnification * 100).rounded()))%")
+            .font(.system(size: 12).monospacedDigit())
+            .frame(minWidth: 44)
+            .accessibilityLabel("Zoom \(Int((zoom.magnification * 100).rounded())) percent")
+        Button(action: zoom.zoomIn) { Image(systemName: "plus.magnifyingglass") }
+            .keyboardShortcut("=", modifiers: .command)
+            .help("Zoom In (⌘+)")
+        Button("Fit", action: zoom.fit)
+            .keyboardShortcut("9", modifiers: .command)
+            .help("Zoom to Fit (⌘9)")
+        Button("100%", action: zoom.actualSize)
+            .keyboardShortcut("0", modifiers: .command)
+            .help("Actual Size (⌘0)")
+    }
+
+    /// SVG has no fixed pixel size, so "Fit" is the base and there is no 100%.
+    @ViewBuilder
+    private var svgZoomControls: some View {
+        Button(action: svgZoom.zoomOut) { Image(systemName: "minus.magnifyingglass") }
+            .keyboardShortcut("-", modifiers: .command)
+            .help("Zoom Out (⌘-)")
+        Button(action: svgZoom.zoomIn) { Image(systemName: "plus.magnifyingglass") }
+            .keyboardShortcut("=", modifiers: .command)
+            .help("Zoom In (⌘+)")
+        Button("Fit", action: svgZoom.fit)
+            .keyboardShortcut("9", modifiers: .command)
+            .help("Zoom to Fit (⌘9)")
     }
 }
 

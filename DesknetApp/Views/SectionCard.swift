@@ -81,10 +81,10 @@ struct SectionCard: View {
     private func imageBlock(_ data: Data?) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             if let data {
-                if NSImage(data: data) != nil {
+                if let payload = Self.copyPayload(for: data) {
                     HStack {
                         Spacer()
-                        CopyButton(payload: .image(data), label: "Copy \(content.section.title) Image", onCopy: onCopy)
+                        CopyButton(payload: payload, label: "Copy \(content.section.title) Image", onCopy: onCopy)
                     }
                 }
                 imagePreview(data, label: "\(content.section.title) image")
@@ -95,11 +95,50 @@ struct SectionCard: View {
         .tintedBox(tint)
     }
 
+    /// nil when there is nothing usable to copy (undecodable bitmap).
+    private static func copyPayload(for data: Data) -> CopyPayload? {
+        if RequestDetail.isSVG(data) { return .svg(data) }
+        return NSImage(data: data) != nil ? .image(data) : nil
+    }
+
     @ViewBuilder
     private func imagePreview(_ data: Data, label: String) -> some View {
+        if RequestDetail.isSVG(data) {
+            svgPreview(data, label: label)
+        } else {
+            bitmapPreview(data, label: label)
+        }
+    }
+
+    /// WebKit thumbnail. Clicks pass through the web view to the button, which opens the sheet.
+    private func svgPreview(_ data: Data, label: String) -> some View {
+        // Native size when NSImage can read it, else a fixed box; the SVG scales to fit either way.
+        let size = NSImage(data: data)?.size ?? CGSize(width: 300, height: 200)
+        let scale = min(1, 400 / max(size.width, 1), 400 / max(size.height, 1))
+        return VStack(alignment: .leading, spacing: 8) {
+            Button {
+                preview = ImagePreviewItem(title: label, data: data, image: nil)
+            } label: {
+                SVGWebView(data: data)
+                    .frame(width: max(size.width * scale, 40), height: max(size.height * scale, 40))
+                    .clipShape(RoundedRectangle(cornerRadius: 4))
+                    .contentShape(Rectangle())
+            }
+            .buttonStyle(.plain)
+            .help("Open preview to zoom")
+            .accessibilityLabel(label)
+            .accessibilityHint("Opens a zoomable preview")
+            Text("SVG · \(ByteCountFormatter.string(fromByteCount: Int64(data.count), countStyle: .file))")
+                .font(.system(size: 11))
+                .foregroundColor(.secondary)
+        }
+    }
+
+    @ViewBuilder
+    private func bitmapPreview(_ data: Data, label: String) -> some View {
         if let image = NSImage(data: data) {
             Button {
-                preview = ImagePreviewItem(title: label, image: image, data: data)
+                preview = ImagePreviewItem(title: label, data: data, image: image)
             } label: {
                 Image(nsImage: image)
                     .resizable()
@@ -156,8 +195,10 @@ struct SectionCard: View {
                 switch part.value {
                 case let .text(text):
                     CopyButton(text: text, label: "Copy \(name)", onCopy: onCopy)
-                case let .image(data) where NSImage(data: data) != nil:
-                    CopyButton(payload: .image(data), label: "Copy \(name) Image", onCopy: onCopy)
+                case let .image(data):
+                    if let payload = Self.copyPayload(for: data) {
+                        CopyButton(payload: payload, label: "Copy \(name) Image", onCopy: onCopy)
+                    }
                 default:
                     EmptyView()
                 }
