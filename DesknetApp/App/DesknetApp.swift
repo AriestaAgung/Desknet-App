@@ -29,9 +29,18 @@ final class DesknetAppDelegate: NSObject, NSApplicationDelegate {
         DesknetAgentInstaller.install()
         runningApps.start()
 
-        let viewModel = MonitorViewModel(store: store, runningApps: runningApps) { text in
-            NSPasteboard.general.clearContents()
-            NSPasteboard.general.setString(text, forType: .string)
+        let viewModel = MonitorViewModel(store: store, runningApps: runningApps) { payload in
+            let pasteboard = NSPasteboard.general
+            switch payload {
+            case let .text(text):
+                pasteboard.clearContents()
+                pasteboard.setString(text, forType: .string)
+            case let .image(data):
+                // NSImage writes TIFF and PNG, so any app can paste it. Undecodable data leaves the pasteboard alone.
+                guard let image = NSImage(data: data) else { return }
+                pasteboard.clearContents()
+                pasteboard.writeObjects([image])
+            }
         }
         let controller = DesknetWindowController(viewModel: viewModel)
         windowController = controller
