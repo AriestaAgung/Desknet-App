@@ -5,7 +5,7 @@ struct RequestDetailView: View {
     let detail: RequestDetail?
     let emptyText: String
     let isExpanded: (DetailSection) -> Binding<Bool>
-    let onCopy: (String) -> Void
+    let onCopy: (CopyPayload) -> Void
 
     var body: some View {
         if let detail {

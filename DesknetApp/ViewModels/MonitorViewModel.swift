@@ -28,16 +28,16 @@ final class MonitorViewModel {
 
     @ObservationIgnored private let store: DesknetStore
     @ObservationIgnored private let runningApps: RunningAppsMonitor
-    @ObservationIgnored private let copyText: (String) -> Void
+    @ObservationIgnored private let copyPayload: (CopyPayload) -> Void
     @ObservationIgnored private let formatter = EntryFormatter()
     /// Stored entries never change, so each row is formatted once. Pruned when the store shrinks (Clear).
     @ObservationIgnored private var rowCache: [UUID: RequestRow] = [:]
     @ObservationIgnored private var storeChanges: AnyCancellable?
 
-    init(store: DesknetStore, runningApps: RunningAppsMonitor, copy: @escaping (String) -> Void) {
+    init(store: DesknetStore, runningApps: RunningAppsMonitor, copy: @escaping (CopyPayload) -> Void) {
         self.store = store
         self.runningApps = runningApps
-        self.copyText = copy
+        self.copyPayload = copy
         storeChanges = store.changes
             .receive(on: DispatchQueue.main)
             .sink { [weak self] in
@@ -113,8 +113,8 @@ final class MonitorViewModel {
         store.clear()
     }
 
-    func copy(_ text: String) {
-        copyText(text)
+    func copy(_ payload: CopyPayload) {
+        copyPayload(payload)
     }
 
     func reload() {

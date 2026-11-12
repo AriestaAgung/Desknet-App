@@ -4,7 +4,7 @@ import SwiftUI
 struct SectionCard: View {
     let content: RequestDetail.SectionContent
     @Binding var isExpanded: Bool
-    let onCopy: (String) -> Void
+    let onCopy: (CopyPayload) -> Void
 
     var body: some View {
         DisclosureCard(title: content.section.title, isExpanded: $isExpanded) {
@@ -72,6 +72,12 @@ struct SectionCard: View {
     private func imageBlock(_ data: Data?) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             if let data {
+                if NSImage(data: data) != nil {
+                    HStack {
+                        Spacer()
+                        CopyButton(payload: .image(data), label: "Copy \(content.section.title) Image", onCopy: onCopy)
+                    }
+                }
                 imagePreview(data, label: "\(content.section.title) image")
             }
         }
@@ -131,8 +137,13 @@ struct SectionCard: View {
                     }
                 }
                 Spacer()
-                if case let .text(text) = part.value {
+                switch part.value {
+                case let .text(text):
                     CopyButton(text: text, label: "Copy \(name)", onCopy: onCopy)
+                case let .image(data) where NSImage(data: data) != nil:
+                    CopyButton(payload: .image(data), label: "Copy \(name) Image", onCopy: onCopy)
+                default:
+                    EmptyView()
                 }
             }
             switch part.value {
