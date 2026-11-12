@@ -5,8 +5,17 @@ struct SectionCard: View {
     let content: RequestDetail.SectionContent
     @Binding var isExpanded: Bool
     let onCopy: (CopyPayload) -> Void
+    /// Image opened in the zoomable preview sheet, if any.
+    @State private var preview: ImagePreviewItem?
 
     var body: some View {
+        card
+            .sheet(item: $preview) { item in
+                ImagePreviewSheet(item: item, onCopy: onCopy)
+            }
+    }
+
+    private var card: some View {
         DisclosureCard(title: content.section.title, isExpanded: $isExpanded) {
             switch content.content {
             case let .headers(headers):
@@ -89,12 +98,19 @@ struct SectionCard: View {
     @ViewBuilder
     private func imagePreview(_ data: Data, label: String) -> some View {
         if let image = NSImage(data: data) {
-            Image(nsImage: image)
-                .resizable()
-                .interpolation(.high)
-                .scaledToFit()
-                .frame(maxWidth: min(image.size.width, 400), maxHeight: min(image.size.height, 400))
-                .accessibilityLabel(label)
+            Button {
+                preview = ImagePreviewItem(title: label, image: image, data: data)
+            } label: {
+                Image(nsImage: image)
+                    .resizable()
+                    .interpolation(.high)
+                    .scaledToFit()
+                    .frame(maxWidth: min(image.size.width, 400), maxHeight: min(image.size.height, 400))
+            }
+            .buttonStyle(.plain)
+            .help("Open preview to zoom")
+            .accessibilityLabel(label)
+            .accessibilityHint("Opens a zoomable preview")
             Text("\(Int(image.size.width)) × \(Int(image.size.height)) px")
                 .font(.system(size: 11))
                 .foregroundColor(.secondary)
