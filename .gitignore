@@ -5,3 +5,4 @@ graphify-out/
 CLAUDE.md
 Checks/
 docs/
+.build/
