@@ -2,7 +2,8 @@ name: CI
 
 on:
   push:
-    branches: [main, dev]
+    # TEMP: feat/github-action-build tests the pipeline before merge; remove it in the PR.
+    branches: [main, dev, feat/github-action-build]
     tags: ["v*"]
   pull_request:
   workflow_dispatch:
