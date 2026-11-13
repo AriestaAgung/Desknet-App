@@ -1,0 +1,119 @@
+name: CI
+
+on:
+  push:
+    branches: [main, dev]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  # The project uses the Xcode 27 project.xcproj format; the xcode-27 image defaults to 27.1.
+  XCODE_APP: /Applications/Xcode_27.2.app
+
+jobs:
+  lint:
+    runs-on: xcode-27
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - name: Select Xcode
+        run: sudo xcode-select -s "$XCODE_APP"
+      - name: swift-format
+        run: xcrun swift-format lint --strict --recursive --parallel DesknetApp DesknetAgent Tests Package.swift
+
+  test:
+    runs-on: xcode-27
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v6
+      - name: Select Xcode
+        run: sudo xcode-select -s "$XCODE_APP"
+      - name: swift test
+        run: swift test
+
+  build:
+    needs: [lint, test]
+    runs-on: xcode-27
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+      - name: Select Xcode
+        run: sudo xcode-select -s "$XCODE_APP"
+      - name: Resolve version
+        id: version
+        env:
+          REF_TYPE: ${{ github.ref_type }}
+          REF_NAME: ${{ github.ref_name }}
+          SHA: ${{ github.sha }}
+        run: |
+          if [ "$REF_TYPE" = "tag" ]; then
+            version="${REF_NAME#v}"
+          else
+            version="0.0.0-${SHA::7}"
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+      - name: Build Release (ad-hoc signed)
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+          BUILD_NUMBER: ${{ github.run_number }}
+        run: |
+          xcodebuild \
+            -project DesknetApp.xcodeproj \
+            -scheme DesknetApp \
+            -configuration Release \
+            -derivedDataPath build \
+            CODE_SIGN_IDENTITY=- \
+            CODE_SIGN_STYLE=Manual \
+            DEVELOPMENT_TEAM= \
+            MARKETING_VERSION="$VERSION" \
+            CURRENT_PROJECT_VERSION="$BUILD_NUMBER" \
+            build
+      - name: Verify and package
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          app=build/Build/Products/Release/Desknet.app
+          codesign --verify --deep --strict "$app"
+          mkdir -p dist
+          ditto -c -k --keepParent "$app" "dist/Desknet-$VERSION.zip"
+          (cd dist && shasum -a 256 "Desknet-$VERSION.zip" > "Desknet-$VERSION.zip.sha256")
+      - uses: actions/upload-artifact@v7
+        with:
+          name: Desknet-${{ steps.version.outputs.version }}
+          path: dist/
+          if-no-files-found: error
+
+  release:
+    if: github.ref_type == 'tag'
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v7
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v3
+        with:
+          files: |
+            dist/*.zip
+            dist/*.sha256
+          fail_on_unmatched_files: true
+          generate_release_notes: true
+          prerelease: ${{ contains(github.ref_name, '-') }}
+          body: |
+            Unsigned (ad-hoc) and not notarized. macOS quarantines it on download; after unzipping run:
+
+            ```sh
+            xattr -dr com.apple.quarantine Desknet.app
+            ```
