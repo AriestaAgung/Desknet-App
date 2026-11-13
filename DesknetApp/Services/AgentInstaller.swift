@@ -35,7 +35,8 @@ enum DesknetAgentInstaller {
                 try files.moveItem(at: temporary, to: destination)
             }
         } catch {
-            DesknetDiagnostics.log("Agent", "install failed path=\(destination.path) error=\(error.localizedDescription)")
+            DesknetDiagnostics.log(
+                "Agent", "install failed path=\(destination.path) error=\(error.localizedDescription)")
         }
     }
 }

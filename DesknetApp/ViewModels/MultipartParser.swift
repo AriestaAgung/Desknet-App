@@ -45,7 +45,8 @@ enum MultipartParser {
                 headerBlock = Data()
                 bodyStart = partStart + crlf.count
             } else if let end = data.range(of: headerEnd, in: partStart..<next.upperBound),
-                      end.upperBound <= next.lowerBound + crlf.count {
+                end.upperBound <= next.lowerBound + crlf.count
+            {
                 headerBlock = Data(data[partStart..<end.lowerBound])
                 // An empty body leaves the header terminator overlapping the delimiter's CRLF.
                 bodyStart = min(end.upperBound, next.lowerBound)
@@ -76,7 +77,8 @@ enum MultipartParser {
         } else {
             value = .binary(body.count)
         }
-        return MultipartPart(name: disposition["name"], filename: disposition["filename"], contentType: type, value: value)
+        return MultipartPart(
+            name: disposition["name"], filename: disposition["filename"], contentType: type, value: value)
     }
 
     /// `key=value` parameters after the first `;` of a header value. Keys lowercased, quotes removed.

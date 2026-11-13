@@ -118,7 +118,8 @@ final class ImageZoomController: ObservableObject {
     /// Whole image in view. Never upscales: small images open at 100%.
     func fit() {
         guard let scrollView, let document = scrollView.documentView,
-              document.frame.width > 0, document.frame.height > 0 else { return }
+            document.frame.width > 0, document.frame.height > 0
+        else { return }
         let available = scrollView.contentSize
         let scale = min(available.width / document.frame.width, available.height / document.frame.height)
         zoom(to: min(1, scale), centeredAt: NSPoint(x: document.frame.midX, y: document.frame.midY))

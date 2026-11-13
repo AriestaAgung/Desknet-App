@@ -19,8 +19,10 @@ struct SVGWebView: NSViewRepresentable {
     final class Coordinator: NSObject, WKNavigationDelegate {
         var loadedData: Data?
 
-        func webView(_ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
-                     decisionHandler: @escaping (WKNavigationActionPolicy) -> Void) {
+        func webView(
+            _ webView: WKWebView, decidePolicyFor navigationAction: WKNavigationAction,
+            decisionHandler: @escaping (WKNavigationActionPolicy) -> Void
+        ) {
             // Only the page we load ourselves; links and redirects go nowhere.
             decisionHandler(navigationAction.request.url?.scheme == "about" ? .allow : .cancel)
         }
@@ -103,11 +105,11 @@ enum SVGSandbox {
     private static var attempted = false
 
     private static let rules = """
-    [
-      {"trigger": {"url-filter": ".*"}, "action": {"type": "block"}},
-      {"trigger": {"url-filter": "^(about|data):"}, "action": {"type": "ignore-previous-rules"}}
-    ]
-    """
+        [
+          {"trigger": {"url-filter": ".*"}, "action": {"type": "block"}},
+          {"trigger": {"url-filter": "^(about|data):"}, "action": {"type": "ignore-previous-rules"}}
+        ]
+        """
 
     static func ruleList() async -> WKContentRuleList? {
         if attempted { return compiled }

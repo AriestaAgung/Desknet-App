@@ -20,7 +20,8 @@ enum RunningAppScanner {
         guard bundle.pathExtension == "app" else { return nil }
 
         if path.contains("/data/Containers/Bundle/Application/"),
-           let devices = path.range(of: "/CoreSimulator/Devices/") {
+            let devices = path.range(of: "/CoreSimulator/Devices/")
+        {
             // Xcode runs Simulator apps under its debugger; untraced ones were opened from the home screen.
             guard isTraced else { return nil }
             let udid = path[devices.upperBound...].prefix { $0 != "/" }
@@ -41,7 +42,7 @@ enum RunningAppScanner {
         size = procs.count * MemoryLayout<kinfo_proc>.stride
         guard sysctl(&mib, 4, &procs, &size, nil, 0) == 0 else { return [] }
 
-        var buffer = [CChar](repeating: 0, count: Int(MAXPATHLEN) * 4) // PROC_PIDPATHINFO_MAXSIZE
+        var buffer = [CChar](repeating: 0, count: Int(MAXPATHLEN) * 4)  // PROC_PIDPATHINFO_MAXSIZE
         var apps: [RunningApp] = []
         for proc in procs.prefix(size / MemoryLayout<kinfo_proc>.stride) {
             let pid = proc.kp_proc.p_pid
@@ -50,14 +51,17 @@ enum RunningAppScanner {
             guard let match = classify(path: String(cString: buffer), isTraced: isTraced) else { continue }
 
             let info = Bundle(url: match.bundleURL)?.infoDictionary
-            let name = info?["CFBundleDisplayName"] as? String
+            let name =
+                info?["CFBundleDisplayName"] as? String
                 ?? info?["CFBundleName"] as? String
                 ?? match.bundleURL.deletingPathExtension().lastPathComponent
-            let platform = match.simulatorUDID.map { RunningApp.Platform.simulator(deviceName: simulatorName($0)) } ?? .mac
-            apps.append(RunningApp(
-                pid: pid, name: name, bundleID: info?["CFBundleIdentifier"] as? String,
-                platform: platform, isDebugged: isTraced
-            ))
+            let platform =
+                match.simulatorUDID.map { RunningApp.Platform.simulator(deviceName: simulatorName($0)) } ?? .mac
+            apps.append(
+                RunningApp(
+                    pid: pid, name: name, bundleID: info?["CFBundleIdentifier"] as? String,
+                    platform: platform, isDebugged: isTraced
+                ))
         }
         return apps.sorted { ($0.name, $0.pid) < ($1.name, $1.pid) }
     }

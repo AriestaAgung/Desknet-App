@@ -124,19 +124,23 @@ struct RequestDetail: Identifiable, Equatable {
                 content = .headers(Self.sorted(entry.responseHeaders))
             case .requestBody:
                 let type = Self.header("Content-Type", in: entry.requestHeaders)
-                content = Self.bodyContent(entry.requestBody, contentType: type,
-                                           decode: decodesBody(section), formatter: formatter)
+                content = Self.bodyContent(
+                    entry.requestBody, contentType: type,
+                    decode: decodesBody(section), formatter: formatter)
             case .responseBody:
                 let type = entry.mimeType ?? Self.header("Content-Type", in: entry.responseHeaders)
-                content = Self.bodyContent(entry.responseBody, contentType: type,
-                                           decode: decodesBody(section), formatter: formatter)
+                content = Self.bodyContent(
+                    entry.responseBody, contentType: type,
+                    decode: decodesBody(section), formatter: formatter)
             }
             return SectionContent(section: section, content: content)
         }
     }
 
-    private static func bodyContent(_ data: Data, contentType: String?, decode: Bool,
-                                     formatter: EntryFormatter) -> SectionContent.Content {
+    private static func bodyContent(
+        _ data: Data, contentType: String?, decode: Bool,
+        formatter: EntryFormatter
+    ) -> SectionContent.Content {
         if isImage(data, contentType: contentType) {
             return .image(decode ? data : nil)
         }
@@ -160,7 +164,8 @@ struct RequestDetail: Identifiable, Equatable {
     /// SVG markup: starts with a tag and has `<svg` near the top (after any XML declaration, comments or doctype).
     static func isSVG(_ data: Data) -> Bool {
         let head = String(decoding: data.prefix(1024), as: UTF8.self).lowercased()
-        let trimmed = head.trimmingCharacters(in: CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: "\u{FEFF}")))
+        let trimmed = head.trimmingCharacters(
+            in: CharacterSet.whitespacesAndNewlines.union(CharacterSet(charactersIn: "\u{FEFF}")))
         return trimmed.hasPrefix("<") && head.contains("<svg")
     }
 
@@ -172,11 +177,14 @@ struct RequestDetail: Identifiable, Equatable {
     private static func sniffImage(_ data: Data) -> Bool {
         let b = [UInt8](data.prefix(12))
         guard b.count >= 4 else { return false }
-        if b.starts(with: [0x89, 0x50, 0x4E, 0x47]) { return true } // PNG
-        if b.starts(with: [0xFF, 0xD8, 0xFF]) { return true } // JPEG
-        if b.starts(with: [0x47, 0x49, 0x46, 0x38]) { return true } // GIF
+        if b.starts(with: [0x89, 0x50, 0x4E, 0x47]) { return true }  // PNG
+        if b.starts(with: [0xFF, 0xD8, 0xFF]) { return true }  // JPEG
+        if b.starts(with: [0x47, 0x49, 0x46, 0x38]) { return true }  // GIF
         if b.count >= 12, b.starts(with: [0x52, 0x49, 0x46, 0x46]),
-           b[8...11].elementsEqual([0x57, 0x45, 0x42, 0x50]) { return true } // WEBP
+            b[8...11].elementsEqual([0x57, 0x45, 0x42, 0x50])
+        {
+            return true
+        }  // WEBP
         return false
     }
 

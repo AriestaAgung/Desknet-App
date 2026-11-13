@@ -1,4 +1,5 @@
 import SwiftUI
+
 /// Icon-only copy button. `label` is both the VoiceOver label and the tooltip.
 struct CopyButton: View {
     let payload: CopyPayload

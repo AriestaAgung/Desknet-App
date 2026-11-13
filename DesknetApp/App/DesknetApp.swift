@@ -111,7 +111,8 @@ final class DesknetAppDelegate: NSObject, NSApplicationDelegate {
     private func showListenerAlert() {
         let alert = NSAlert()
         alert.messageText = "Desknet can't receive logs"
-        alert.informativeText = "Another Desknet viewer is already using \(DesknetBridgeSocket.path()), or the socket couldn't be created. Quit the other viewer and reopen Desknet."
+        alert.informativeText =
+            "Another Desknet viewer is already using \(DesknetBridgeSocket.path()), or the socket couldn't be created. Quit the other viewer and reopen Desknet."
         alert.runModal()
     }
 }

@@ -64,13 +64,17 @@ final class MonitorViewModel {
     /// "All apps", then each running app, then the selected app if it has quit, so its logs stay reachable.
     var appRows: [AppRow] {
         let apps = runningApps.apps
-        var rows = [AppRow(pid: nil, title: "All apps", subtitle: "\(totalCount) requests", isLive: !connectedPIDs.isEmpty)]
+        var rows = [
+            AppRow(pid: nil, title: "All apps", subtitle: "\(totalCount) requests", isLive: !connectedPIDs.isEmpty)
+        ]
         rows += apps.map { app in
             AppRow(pid: app.pid, title: app.name, subtitle: subtitle(for: app), isLive: connectedPIDs.contains(app.pid))
         }
         if let pid = selectedPID, !apps.contains(where: { $0.pid == pid }) {
-            rows.append(AppRow(pid: pid, title: "Ended app",
-                               subtitle: "PID \(pid) · \(countsByPID[pid, default: 0]) requests", isLive: false))
+            rows.append(
+                AppRow(
+                    pid: pid, title: "Ended app",
+                    subtitle: "PID \(pid) · \(countsByPID[pid, default: 0]) requests", isLive: false))
         }
         return rows
     }
@@ -158,7 +162,8 @@ final class MonitorViewModel {
     private func updateDetail(force: Bool = false) {
         guard force || detail?.id != selectedEntryID else { return }
         let collapsed = collapsedSections
-        detail = selectedEntryID
+        detail =
+            selectedEntryID
             .flatMap { id in entries.first { $0.id == id } }
             .map { RequestDetail(entry: $0, formatter: formatter, decodesBody: { !collapsed.contains($0) }) }
     }

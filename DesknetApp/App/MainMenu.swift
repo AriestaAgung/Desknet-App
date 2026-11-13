@@ -11,7 +11,9 @@ enum MainMenu {
         let main = NSMenu()
 
         let app = NSMenu()
-        app.addItem(withTitle: "About Desknet", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)), keyEquivalent: "")
+        app.addItem(
+            withTitle: "About Desknet", action: #selector(NSApplication.orderFrontStandardAboutPanel(_:)),
+            keyEquivalent: "")
         app.addItem(.separator())
         app.addItem(withTitle: "Hide Desknet", action: #selector(NSApplication.hide(_:)), keyEquivalent: "h")
         app.addItem(withTitle: "Quit Desknet", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")

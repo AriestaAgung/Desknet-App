@@ -78,17 +78,19 @@ struct EntryFormatter {
         guard !data.isEmpty else { return "{}" }
 
         if let object = try? JSONSerialization.jsonObject(with: data),
-           JSONSerialization.isValidJSONObject(object),
-           let pretty = try? JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys]),
-           let text = String(data: pretty, encoding: .utf8) {
+            JSONSerialization.isValidJSONObject(object),
+            let pretty = try? JSONSerialization.data(withJSONObject: object, options: [.prettyPrinted, .sortedKeys]),
+            let text = String(data: pretty, encoding: .utf8)
+        {
             return text
         }
         if let text = String(data: data, encoding: .utf8), !text.isEmpty {
             return text
         }
         if (contentType ?? "").localizedCaseInsensitiveContains("json"),
-           let text = String(data: data, encoding: .ascii),
-           !text.isEmpty {
+            let text = String(data: data, encoding: .ascii),
+            !text.isEmpty
+        {
             return text
         }
         return "Binary body (\(data.count) bytes)"

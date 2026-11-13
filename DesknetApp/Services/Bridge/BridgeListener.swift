@@ -16,8 +16,10 @@ final class DesknetBridgeListener: @unchecked Sendable {
     private var listenFD: Int32?
     private var listenInode: ino_t = 0
 
-    init(store: DesknetStore, path: String = DesknetBridgeSocket.path(),
-         onCommand: @escaping @Sendable (DesknetBridgeMessage) -> Void) {
+    init(
+        store: DesknetStore, path: String = DesknetBridgeSocket.path(),
+        onCommand: @escaping @Sendable (DesknetBridgeMessage) -> Void
+    ) {
         self.store = store
         self.path = path
         self.onCommand = onCommand
@@ -49,7 +51,7 @@ final class DesknetBridgeListener: @unchecked Sendable {
                 let client = accept(fd, nil, nil)
                 guard client >= 0 else {
                     if errno == EINTR { continue }
-                    return // listener closed by stop()
+                    return  // listener closed by stop()
                 }
                 Thread.detachNewThread { self?.read(client) }
             }

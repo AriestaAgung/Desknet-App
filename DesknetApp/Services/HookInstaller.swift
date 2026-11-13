@@ -5,7 +5,8 @@ import Foundation
 enum DesknetHookInstaller {
     static let begin = "# BEGIN Desknet Xcode Hook"
     static let end = "# END Desknet Xcode Hook"
-    static let block = "\(begin)\ncommand script import \"~/Library/Application Support/Desknet/desknet_hook.py\"\n\(end)\n"
+    static let block =
+        "\(begin)\ncommand script import \"~/Library/Application Support/Desknet/desknet_hook.py\"\n\(end)\n"
 
     /// Xcode 27.1 reads the first; the second is for other Xcode versions.
     static let files = [".lldbinit-Xcode", ".lldbinit-lldb-rpc-server"].map {
@@ -13,7 +14,9 @@ enum DesknetHookInstaller {
     }
 
     static var isInstalled: Bool {
-        files.allSatisfy { (try? String(contentsOf: $0.resolvingSymlinksInPath(), encoding: .utf8))?.contains(begin) == true }
+        files.allSatisfy {
+            (try? String(contentsOf: $0.resolvingSymlinksInPath(), encoding: .utf8))?.contains(begin) == true
+        }
     }
 
     static func install() throws { try edit(adding(to:)) }
@@ -26,7 +29,8 @@ enum DesknetHookInstaller {
 
     static func removing(from text: String) -> String {
         guard let start = text.range(of: begin),
-              let stop = text.range(of: end, range: start.upperBound..<text.endIndex) else { return text }
+            let stop = text.range(of: end, range: start.upperBound..<text.endIndex)
+        else { return text }
         var upper = stop.upperBound
         if upper < text.endIndex, text[upper] == "\n" { upper = text.index(after: upper) }
         return text.replacingCharacters(in: start.lowerBound..<upper, with: "")
